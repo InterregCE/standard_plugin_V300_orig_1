@@ -1,0 +1,41 @@
+import io.cloudflight.gradle.RepositoryVisibility
+
+plugins {
+    id "cloudflight-gradle-plugin" version "5.15.2"
+}
+
+description "Jems standard plugins"
+group 'io.cloudflight.jems.plugin.standard'
+version '1.0.16'
+
+cloudflight {
+    visibility = RepositoryVisibility.PUBLIC
+    softwareProjectKey = "interact/ems"
+}
+
+if (isCloudflightBuild()) {
+    bootJar {
+        enabled = false
+    }
+}
+jar {
+    enabled = true
+}
+if (isKotlinProject(project)) {
+    dependencies {
+        implementation platform("io.cloudflight.platform:platform-bom:$cloudflightPlatformVersion")
+        annotationProcessor platform("io.cloudflight.platform:platform-bom:$cloudflightPlatformVersion")
+        testImplementation platform("io.cloudflight.platform:platform-test-bom:$cloudflightPlatformVersion")
+        kapt platform("io.cloudflight.platform:platform-bom:$cloudflightPlatformVersion")
+
+        constraints {
+            implementation "com.github.doyaaaaaken:kotlin-csv-jvm:0.15.0"
+            implementation('io.cloudflight.jems.plugin.contract:jems-plugin-contract:1.0.18')
+        }
+    }
+}
+dependencies {
+    implementation('io.cloudflight.jems.plugin.contract:jems-plugin-contract')
+    implementation('org.springframework.boot:spring-boot-starter-web')
+}
+

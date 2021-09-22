@@ -1,0 +1,16 @@
+{
+  "suppressedRules": [
+    {
+      "rule": "gradle.buildlog.errors.io.cloudflight.gradle.license.missing",
+      "reason": "we don't know what kind of license we should provide for the jems-plugin-contract"
+    },
+    {
+      "rule": "archunit.architecture.maven.group-id",
+      "reason": "config classes could be outside of defined group-id for the project since they are going to be picked by jems-server and should be places in the 'io.cloudflight.jems.plugin.config' package structure"
+    },
+    {
+      "rule": "",
+      "reason": "Bypass undefined errors"
+    }
+  ]
+}

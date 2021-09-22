@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RemoteRepositoriesConfiguration">
+    <remote-repository>
+      <option name="id" value="central" />
+      <option name="name" value="Maven Central repository" />
+      <option name="url" value="https://repo1.maven.org/maven2" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="jboss.community" />
+      <option name="name" value="JBoss Community repository" />
+      <option name="url" value="https://repository.jboss.org/nexus/content/repositories/public/" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="interact/ems-PRIVATE" />
+      <option name="name" value="interact/ems-PRIVATE" />
+      <option name="url" value="https://artifacts.cloudflight.io/repository/interact-ems-maven-private" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="cloudflight" />
+      <option name="name" value="cloudflight" />
+      <option name="url" value="https://artifacts.cloudflight.io/repository/all-maven" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="interact/ems-PUBLIC" />
+      <option name="name" value="interact/ems-PUBLIC" />
+      <option name="url" value="https://artifacts.cloudflight.io/repository/interact-ems-maven-public" />
+    </remote-repository>
+  </component>
+</project>

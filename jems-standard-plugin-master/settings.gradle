@@ -1,0 +1,7 @@
+pluginManagement {
+    repositories {
+        maven { url "https://artifacts.cloudflight.io/repository/plugins-maven" }
+    }
+}
+
+rootProject.name = 'jems-standard-plugin'
