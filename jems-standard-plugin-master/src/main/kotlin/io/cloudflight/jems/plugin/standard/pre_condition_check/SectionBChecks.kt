@@ -54,8 +54,8 @@ fun checkSectionB(sectionBData: ProjectDataSectionB): PreConditionCheckMessage {
         checkIfTotalBudgetIsGreaterThanZero(sectionBData.partners),
 
         checkIfPeriodsAmountSumUpToBudgetEntrySum(sectionBData.partners),
-
-        checkIfTotalCoFinancingIsGreaterThanZero(sectionBData.partners),
+        // Amund: reoved (see function below)
+        //checkIfTotalCoFinancingIsGreaterThanZero(sectionBData.partners),
 
         checkIfCoFinancingContentIsProvided(sectionBData.partners),
 
@@ -77,14 +77,14 @@ private fun checkIfExactlyOneLeadPartnerIsAdded(partners: Set<ProjectPartnerData
             buildErrorPreConditionCheckMessage("$SECTION_B_ERROR_MESSAGES_PREFIX.exactly.one.lead.partner.should.be.added")
         else -> buildInfoPreConditionCheckMessage("$SECTION_B_INFO_MESSAGES_PREFIX.exactly.one.lead.partner.is.added")
     }
-
-private fun checkIfTotalCoFinancingIsGreaterThanZero(partners: Set<ProjectPartnerData>) =
-    when {
-        partners.isNullOrEmpty() -> null
-        partners.any { partner -> partner.budget.projectPartnerCoFinancing.finances.any {it.percentage <= BigDecimal.ZERO && it.fundType != ProjectPartnerCoFinancingFundTypeData.PartnerContribution  }} ->
-            buildErrorPreConditionCheckMessage("$SECTION_B_ERROR_MESSAGES_PREFIX.total.co.financing.should.be.greater.than.zero")
-        else -> buildInfoPreConditionCheckMessage("$SECTION_B_INFO_MESSAGES_PREFIX.total.co.financing.is.greater.than.zero")
-    }
+// Amund: Romoved due to conflict for partners outside EU (have no co-financing AKA cofinancing = 0%)
+//private fun checkIfTotalCoFinancingIsGreaterThanZero(partners: Set<ProjectPartnerData>) =
+//    when {
+//        partners.isNullOrEmpty() -> null
+//        partners.any { partner -> partner.budget.projectPartnerCoFinancing.finances.any {it.percentage <= BigDecimal.ZERO && it.fundType != ProjectPartnerCoFinancingFundTypeData.PartnerContribution  }} ->
+//                buildErrorPreConditionCheckMessage("$SECTION_B_ERROR_MESSAGES_PREFIX.total.co.financing.should.be.greater.than.zero")
+//        else -> buildInfoPreConditionCheckMessage("$SECTION_B_INFO_MESSAGES_PREFIX.total.co.financing.is.greater.than.zero")
+//    }
 
 private fun checkIfTotalBudgetIsGreaterThanZero(partners: Set<ProjectPartnerData>) =
     when {
@@ -161,9 +161,9 @@ private fun checkIfPartnerContributionEqualsToBudget(partners: Set<ProjectPartne
                     )
                 )
             }
-            // test Amund - no erdf if partner outside programme area
+            // test Amund - no erdf if partner outside programme area TODO: depending on critereia (all EU or not) can be merged with ERDF 80% check
             partner.addresses.forEach { address ->
-                if (address.country !in listOf("Österreich (AT)", "Deutschland (DE)","Italia (IT)", "Slovenija (SI)", "Slovensko (SK)")){
+                if (address.type == ProjectPartnerAddressTypeData.Organization && address.country !in listOf("Österreich (AT)", "Deutschland (DE)","Italia (IT)", "Slovenija (SI)", "Slovensko (SK)")){
                     partner.budget.projectPartnerCoFinancing.finances.forEach { finance ->
                         if (finance.fundType == ProjectPartnerCoFinancingFundTypeData.MainFund && finance.percentage.intValueExact() != 0) {
                             errorMessages.add(
@@ -176,15 +176,23 @@ private fun checkIfPartnerContributionEqualsToBudget(partners: Set<ProjectPartne
                     }
                 }
             }
-            // test Amund - check erdf 80%
-            partner.budget.projectPartnerCoFinancing.finances.forEach { finance ->
-                if (finance.fundType == ProjectPartnerCoFinancingFundTypeData.MainFund && finance.percentage.intValueExact() != 80) {
-                    errorMessages.add(
-                            buildErrorPreConditionCheckMessage(
+            // test Amund - check erdf 80% ADDED: remove for partners outside EU (have no ERDF)
+            partner.addresses.forEach { address ->
+                if (address.type == ProjectPartnerAddressTypeData.Organization
+                    && address.country in listOf("Österreich (AT)", "Belgique/België (BE)", "Bulgaria (BG)", "Hrvatska (HR)", "Kýpros (CY)", "Česko (CZ)", "Danmark (DK)", "Eesti (EE)", "Suomi/Finland (FI)", "France (FR)", "Deutschland (DE)", "Elláda (EL)", "Magyarország (HU)", "Éire/Ireland (IE)", "Italia (IT)", "Latvija (LV)", "Lietuva (LT)", "Luxembourg (LU)", "Malta (MT)", "Nederland (NL)", "Polska (PL)", "Portugal (PT)", "România (RO)", "Slovensko (SK)", "Slovenija (SI)", "España (ES)", "Sverige (SE)")) {
+                    partner.budget.projectPartnerCoFinancing.finances.forEach { finance ->
+                        if (finance.fundType == ProjectPartnerCoFinancingFundTypeData.MainFund && finance.percentage.intValueExact() != 80) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
                                     "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.erdf.not.80",
-                                    mapOf("name" to (partner.abbreviation), "erdf" to (finance.percentage.intValueExact().toString()))
+                                    mapOf(
+                                        "name" to (partner.abbreviation),
+                                        "erdf" to (finance.percentage.intValueExact().toString())
+                                    )
+                                )
                             )
-                    )
+                        }
+                    }
                 }
             }
             // test Amund - BL2 15% mandatory when not using Other costs flat rate
@@ -723,6 +731,7 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                     // test Amund - must add new if statements here to activate parent error message:
                     partner.vat?.length!! >= 15 ||
                     partner.vat!!.take(2) != partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) ||
+                    // TODO: change from elementAT(0) to type = ProjectPartnerAddressTypeData.Organization
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "AT" && Regex("^(ATU)[0-9]{8}\$").matchEntire(partner.vat!!)==null) ||
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "DE" && Regex("^(DE)[0-9]{9}\$").matchEntire(partner.vat!!)==null) ||
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "HR" && Regex("^(HR)[0-9]{11}\$").matchEntire(partner.vat!!)==null) ||
@@ -798,81 +807,81 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                     val regexSI = Regex("^(SI)[0-9]{8}\$")
                     val countryCode: String? = address.nutsRegion2?.substringAfterLast("(")?.take(2)
 
-
-                    if (countryCode == "AT" && regexAT.matchEntire(partner.vat!!)==null) {
-                        errorMessages.add(
-                            buildErrorPreConditionCheckMessage(
-                                "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.at.regex",
-                                mapOf("name" to (partner.abbreviation))
+                    if (address.type == ProjectPartnerAddressTypeData.Organization) {
+                        if (countryCode == "AT" && regexAT.matchEntire(partner.vat!!) == null) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.at.regex",
+                                    mapOf("name" to (partner.abbreviation))
+                                )
                             )
-                        )
-                    }
-                    if (countryCode == "DE" && regexDE.matchEntire(partner.vat!!)==null) {
-                        errorMessages.add(
-                            buildErrorPreConditionCheckMessage(
-                                "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.de.regex",
-                                mapOf("name" to (partner.abbreviation))
+                        }
+                        if (countryCode == "DE" && regexDE.matchEntire(partner.vat!!) == null) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.de.regex",
+                                    mapOf("name" to (partner.abbreviation))
+                                )
                             )
-                        )
-                    }
-                    if (countryCode == "HR" && regexHR.matchEntire(partner.vat!!)==null) {
-                        errorMessages.add(
-                            buildErrorPreConditionCheckMessage(
-                                "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.hr.regex",
-                                mapOf("name" to (partner.abbreviation))
+                        }
+                        if (countryCode == "HR" && regexHR.matchEntire(partner.vat!!) == null) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.hr.regex",
+                                    mapOf("name" to (partner.abbreviation))
+                                )
                             )
-                        )
-                    }
-                    if (countryCode == "CZ" && regexCZ.matchEntire(partner.vat!!)==null) {
-                        errorMessages.add(
-                            buildErrorPreConditionCheckMessage(
-                                "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.cz.regex",
-                                mapOf("name" to (partner.abbreviation))
+                        }
+                        if (countryCode == "CZ" && regexCZ.matchEntire(partner.vat!!) == null) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.cz.regex",
+                                    mapOf("name" to (partner.abbreviation))
+                                )
                             )
-                        )
-                    }
-                    if (countryCode == "HU" && regexHU.matchEntire(partner.vat!!)==null) {
-                        errorMessages.add(
-                            buildErrorPreConditionCheckMessage(
-                                "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.hu.regex",
-                                mapOf("name" to (partner.abbreviation))
+                        }
+                        if (countryCode == "HU" && regexHU.matchEntire(partner.vat!!) == null) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.hu.regex",
+                                    mapOf("name" to (partner.abbreviation))
+                                )
                             )
-                        )
-                    }
-                    if (countryCode == "IT" && regexIT.matchEntire(partner.vat!!)==null) {
-                        errorMessages.add(
-                            buildErrorPreConditionCheckMessage(
-                                "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.it.regex",
-                                mapOf("name" to (partner.abbreviation))
+                        }
+                        if (countryCode == "IT" && regexIT.matchEntire(partner.vat!!) == null) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.it.regex",
+                                    mapOf("name" to (partner.abbreviation))
+                                )
                             )
-                        )
-                    }
-                    if (countryCode == "PL" && regexPL.matchEntire(partner.vat!!)==null) {
-                        errorMessages.add(
-                            buildErrorPreConditionCheckMessage(
-                                "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.pl.regex",
-                                mapOf("name" to (partner.abbreviation))
+                        }
+                        if (countryCode == "PL" && regexPL.matchEntire(partner.vat!!) == null) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.pl.regex",
+                                    mapOf("name" to (partner.abbreviation))
+                                )
                             )
-                        )
-                    }
-                    if (countryCode == "SK" && regexSK.matchEntire(partner.vat!!)==null) {
-                        errorMessages.add(
-                            buildErrorPreConditionCheckMessage(
-                                "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.sk.regex",
-                                mapOf("name" to (partner.abbreviation))
+                        }
+                        if (countryCode == "SK" && regexSK.matchEntire(partner.vat!!) == null) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.sk.regex",
+                                    mapOf("name" to (partner.abbreviation))
+                                )
                             )
-                        )
-                    }
-                    if (countryCode == "SI" && regexSI.matchEntire(partner.vat!!)==null) {
-                        errorMessages.add(
-                            buildErrorPreConditionCheckMessage(
-                                "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.si.regex",
-                                mapOf("name" to (partner.abbreviation))
+                        }
+                        if (countryCode == "SI" && regexSI.matchEntire(partner.vat!!) == null) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.wrong.vat.si.regex",
+                                    mapOf("name" to (partner.abbreviation))
+                                )
                             )
-                        )
+                        }
                     }
                 }
-
             }
             if (errorMessages.count() > 0) {
                 buildErrorPreConditionCheckMessages(
