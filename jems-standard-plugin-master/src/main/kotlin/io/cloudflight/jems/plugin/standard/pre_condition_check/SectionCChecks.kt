@@ -71,6 +71,8 @@ fun checkSectionC(sectionCData: ProjectDataSectionC?): PreConditionCheckMessage 
 
             checkIfNamesOfWorkPackagesAreProvided(sectionCData?.projectWorkPackages),
 
+            checkIfMoreThan5WorkPackagesAreAdded(sectionCData?.projectWorkPackages),
+
             checkIfObjectivesOfWorkPackagesAreProvided(sectionCData?.projectWorkPackages),
 
             checkIfAtLeastOneOutputForEachWorkPackageIsAdded(sectionCData?.projectWorkPackages),
@@ -276,6 +278,12 @@ private fun checkIfNamesOfWorkPackagesAreProvided(workPackages: List<ProjectWork
         workPackages.isNullOrEmpty() -> null
         workPackages.any { it.name.isNotFullyTranslated(CallDataContainer.get().inputLanguages) }
             -> buildErrorPreConditionCheckMessage("$SECTION_C_ERROR_MESSAGES_PREFIX.names.of.work.packages.should.be.added")
+        else -> null
+    }
+// Amund CE check: max 5 WPs in total
+private fun checkIfMoreThan5WorkPackagesAreAdded(workPackages: List<ProjectWorkPackageData>?) =
+    when {
+        workPackages?.size!! > 5 -> buildErrorPreConditionCheckMessage("$SECTION_C_ERROR_MESSAGES_PREFIX.max.5.work.packages")
         else -> null
     }
 
