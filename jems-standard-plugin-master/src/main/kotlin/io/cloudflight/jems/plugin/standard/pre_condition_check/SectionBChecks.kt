@@ -54,8 +54,8 @@ fun checkSectionB(sectionBData: ProjectDataSectionB): PreConditionCheckMessage {
         checkIfTotalBudgetIsGreaterThanZero(sectionBData.partners),
 
         checkIfPeriodsAmountSumUpToBudgetEntrySum(sectionBData.partners),
-        // Amund: reoved (see function below)
-        //checkIfTotalCoFinancingIsGreaterThanZero(sectionBData.partners),
+
+        checkIfTotalCoFinancingIsGreaterThanZero(sectionBData.partners),
 
         checkIfCoFinancingContentIsProvided(sectionBData.partners),
 
@@ -77,14 +77,14 @@ private fun checkIfExactlyOneLeadPartnerIsAdded(partners: Set<ProjectPartnerData
             buildErrorPreConditionCheckMessage("$SECTION_B_ERROR_MESSAGES_PREFIX.exactly.one.lead.partner.should.be.added")
         else -> buildInfoPreConditionCheckMessage("$SECTION_B_INFO_MESSAGES_PREFIX.exactly.one.lead.partner.is.added")
     }
-// Amund: Romoved due to conflict for partners outside EU (have no co-financing AKA cofinancing = 0%)
-//private fun checkIfTotalCoFinancingIsGreaterThanZero(partners: Set<ProjectPartnerData>) =
-//    when {
-//        partners.isNullOrEmpty() -> null
-//        partners.any { partner -> partner.budget.projectPartnerCoFinancing.finances.any {it.percentage <= BigDecimal.ZERO && it.fundType != ProjectPartnerCoFinancingFundTypeData.PartnerContribution  }} ->
-//                buildErrorPreConditionCheckMessage("$SECTION_B_ERROR_MESSAGES_PREFIX.total.co.financing.should.be.greater.than.zero")
-//        else -> buildInfoPreConditionCheckMessage("$SECTION_B_INFO_MESSAGES_PREFIX.total.co.financing.is.greater.than.zero")
-//    }
+
+private fun checkIfTotalCoFinancingIsGreaterThanZero(partners: Set<ProjectPartnerData>) =
+    when {
+        partners.isNullOrEmpty() -> null
+        partners.any { partner -> partner.budget.projectPartnerCoFinancing.finances.any {it.percentage <= BigDecimal.ZERO && it.fundType != ProjectPartnerCoFinancingFundTypeData.PartnerContribution  }} ->
+                buildErrorPreConditionCheckMessage("$SECTION_B_ERROR_MESSAGES_PREFIX.total.co.financing.should.be.greater.than.zero")
+        else -> buildInfoPreConditionCheckMessage("$SECTION_B_INFO_MESSAGES_PREFIX.total.co.financing.is.greater.than.zero")
+    }
 
 private fun checkIfTotalBudgetIsGreaterThanZero(partners: Set<ProjectPartnerData>) =
     when {
@@ -161,21 +161,22 @@ private fun checkIfPartnerContributionEqualsToBudget(partners: Set<ProjectPartne
                     )
                 )
             }
+            // remove: only need to check that erdf is 80% for all EU Partners
             // test Amund - no erdf if partner outside programme area TODO: depending on critereia (all EU or not) can be merged with ERDF 80% check
-            partner.addresses.forEach { address ->
-                if (address.type == ProjectPartnerAddressTypeData.Organization && address.country !in listOf("Österreich (AT)", "Deutschland (DE)","Italia (IT)", "Slovenija (SI)", "Slovensko (SK)")){
-                    partner.budget.projectPartnerCoFinancing.finances.forEach { finance ->
-                        if (finance.fundType == ProjectPartnerCoFinancingFundTypeData.MainFund && finance.percentage.intValueExact() != 0) {
-                            errorMessages.add(
-                                buildErrorPreConditionCheckMessage(
-                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.no.erdf.outside",
-                                    mapOf("name" to (partner.abbreviation))
-                                )
-                            )
-                        }
-                    }
-                }
-            }
+            // partner.addresses.forEach { address ->
+            //    if (address.type == ProjectPartnerAddressTypeData.Organization && address.country !in listOf("Österreich (AT)", "Deutschland (DE)","Italia (IT)", "Slovenija (SI)", "Slovensko (SK)")){
+            //        partner.budget.projectPartnerCoFinancing.finances.forEach { finance ->
+            //            if (finance.fundType == ProjectPartnerCoFinancingFundTypeData.MainFund && finance.percentage.intValueExact() != 0) {
+            //                errorMessages.add(
+            //                    buildErrorPreConditionCheckMessage(
+            //                        "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.no.erdf.outside",
+            //                        mapOf("name" to (partner.abbreviation))
+            //                    )
+            //                )
+            //            }
+            //        }
+            //    }
+            //}
             // test Amund - check erdf 80% ADDED: remove for partners outside EU (have no ERDF)
             partner.addresses.forEach { address ->
                 if (address.type == ProjectPartnerAddressTypeData.Organization
@@ -805,9 +806,10 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                     val regexPL = Regex("^(PL)[0-9]{10}\$")
                     val regexSK = Regex("^(SK)[0-9]{10}\$")
                     val regexSI = Regex("^(SI)[0-9]{8}\$")
-                    val countryCode: String? = address.nutsRegion2?.substringAfterLast("(")?.take(2)
 
-                    if (address.type == ProjectPartnerAddressTypeData.Organization) {
+
+                    if (address.type == ProjectPartnerAddressTypeData.Organization && !partner.vat.isNullOrEmpty()) {
+                        val countryCode: String? = address.nutsRegion2?.substringAfterLast("(")?.take(2)
                         if (countryCode == "AT" && regexAT.matchEntire(partner.vat!!) == null) {
                             errorMessages.add(
                                 buildErrorPreConditionCheckMessage(
