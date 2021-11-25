@@ -67,17 +67,7 @@ internal class ChecksSectionA {
             programmePriority = null)
     }
 
-    @Test
-    fun `Project EN Intro Is not Provided`() {
-        CallDataContainer.set(onceStepCallData)
-        LifecycleDataContainer.set(projectLifecycleData)
-        val verification = checkSectionA(sectionAData)
-        assertThat(verification.messageType == MessageType.ERROR).isTrue
-        assertThat(verification.subSectionMessages.any
-            {message ->
-                message.message.i18nKey == "jems.standard.pre.condition.check.plugin.project.section.a.error.intro.in.en.is.not.provided" }
-        ).isTrue
-    }
+
 
     @Test
     fun `Project Intro Is not Provided`() {

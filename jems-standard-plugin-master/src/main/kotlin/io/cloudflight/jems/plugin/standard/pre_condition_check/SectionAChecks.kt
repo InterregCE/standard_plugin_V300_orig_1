@@ -27,9 +27,11 @@ fun checkSectionA(sectionAData: ProjectDataSectionA?): PreConditionCheckMessage 
 
         checkIfProgrammePriorityIsProvided(sectionAData?.programmePriority),
 
-        checkIfIntroIsProvidedInEnglish(sectionAData?.intro),
+        //checkIfIntroIsProvidedInEnglish(sectionAData?.intro),
 
         checkIfIntroIsProvided(sectionAData?.intro)
+
+       // , checkIfDurationNotOver42Months(sectionAData?.duration),
     )
 }
 
@@ -50,7 +52,7 @@ private fun checkIfAcronymIsProvided(acronym: String?) =
 private fun checkIfDurationIsProvided(duration: Int?) =
     when {
         isFieldVisible(ApplicationFormFieldId.PROJECT_DURATION) &&
-        duration == null -> buildErrorPreConditionCheckMessage("$SECTION_A_ERROR_MESSAGES_PREFIX.duration.is.not.provided")
+                (duration == null || duration > 42) -> buildErrorPreConditionCheckMessage("$SECTION_A_ERROR_MESSAGES_PREFIX.duration.is.not.provided")
         else -> null
     }
 
@@ -60,7 +62,7 @@ private fun checkIfProgrammePriorityIsProvided(programmePriority: ProgrammePrior
         (programmePriority == null || programmePriority.code.isBlank()) -> buildErrorPreConditionCheckMessage("$SECTION_A_ERROR_MESSAGES_PREFIX.programme.priority.is.not.provided")
         else -> null
     }
-
+// Amund - Not needed, only one language in Interreg CE
 private fun checkIfIntroIsProvidedInEnglish(intro: Set<InputTranslationData>?) =
     when {
         intro.isNotFullyTranslated(setOf(SystemLanguageData.EN))
@@ -70,11 +72,18 @@ private fun checkIfIntroIsProvidedInEnglish(intro: Set<InputTranslationData>?) =
 
 private fun checkIfIntroIsProvided(intro: Set<InputTranslationData>?) =
     when {
-        intro.isNotFullyTranslated(CallDataContainer.get().inputLanguages)
+        (intro.isNotFullyTranslated(CallDataContainer.get().inputLanguages))
         -> buildErrorPreConditionCheckMessage("$SECTION_A_ERROR_MESSAGES_PREFIX.intro.is.not.provided")
-        else -> null
+       else -> null
     }
 
 private fun isFieldVisible(fieldId: ApplicationFormFieldId): Boolean {
     return isFieldVisible(fieldId, LifecycleDataContainer.get()!!, CallDataContainer.get())
 }
+// Amund - Check for max project duration
+//private fun checkIfDurationNotOver42Months(duration: Int?) =
+//    when {
+//        isFieldVisible(ApplicationFormFieldId.PROJECT_DURATION) &&
+//                duration!! > 42 -> buildErrorPreConditionCheckMessage("$SECTION_A_ERROR_MESSAGES_PREFIX.duration.over.42.months")
+//        else -> null
+//    }

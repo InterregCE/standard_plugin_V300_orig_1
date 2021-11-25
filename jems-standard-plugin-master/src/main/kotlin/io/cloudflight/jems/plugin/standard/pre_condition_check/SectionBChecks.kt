@@ -201,7 +201,7 @@ private fun checkIfPartnerContributionEqualsToBudget(partners: Set<ProjectPartne
                 && partner.budget.projectPartnerOptions?.officeAndAdministrationOnStaffCostsFlatRate != 15) {
                 errorMessages.add(
                     buildErrorPreConditionCheckMessage(
-                        "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.contribution.office.and.admin.not.15",
+                        "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.office.and.admin.not.15",
                         mapOf("name" to (partner.abbreviation))
                     )
                 )
@@ -1442,6 +1442,7 @@ private fun checkIfStateAidIsValid(partners: Set<ProjectPartnerData>) =
                         )
                     )
                 }
+                /* GBER should not be filled in at this stage at all
                 if (partner.stateAid?.answer1 ?: false &&
                     partner.stateAid?.answer2 ?: false &&
                     partner.stateAid?.answer3 ?: false &&
@@ -1456,6 +1457,7 @@ private fun checkIfStateAidIsValid(partners: Set<ProjectPartnerData>) =
                         )
                     )
                 }
+                 */
                 if (partner.stateAid?.answer4 ?: false &&
                     partner.stateAid?.activities.isNullOrEmpty() &&
                     isFieldVisible(ApplicationFormFieldId.PARTNER_STATE_AID_RELEVANT_ACTIVITIES))
@@ -1463,6 +1465,16 @@ private fun checkIfStateAidIsValid(partners: Set<ProjectPartnerData>) =
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
                             "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.activities.failed",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // Amund CE check: stateAidScheme should not be filled in
+                if (isFieldVisible(ApplicationFormFieldId.PARTNER_STATE_AID_SCHEME) && partner.stateAid?.stateAidScheme != null)
+                {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.stateAidScheme.not.empty",
                             mapOf("name" to (partner.abbreviation))
                         )
                     )
