@@ -12,6 +12,7 @@ import io.cloudflight.jems.plugin.contract.models.project.sectionB.partners.Proj
 import io.cloudflight.jems.plugin.contract.models.project.sectionB.partners.ProjectPartnerData
 import io.cloudflight.jems.plugin.contract.models.project.sectionB.partners.ProjectPartnerRoleData
 import io.cloudflight.jems.plugin.contract.models.project.sectionB.partners.budget.ProjectPartnerCoFinancingFundTypeData
+import io.cloudflight.jems.plugin.contract.models.project.sectionC.relevance.ProjectTargetGroupData
 import io.cloudflight.jems.plugin.contract.pre_condition_check.models.PreConditionCheckMessage
 import io.cloudflight.jems.plugin.standard.pre_condition_check.helpers.CallDataContainer
 import io.cloudflight.jems.plugin.standard.pre_condition_check.helpers.LifecycleDataContainer
@@ -730,10 +731,9 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                     partner.vatRecovery == null ||
 
                     // test Amund - must add new if statements here to activate parent error message:
-                    partner.vat?.length!! >= 15 ||
                     partner.vat!!.take(2) != partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) ||
                     // TODO: change from elementAT(0) to type = ProjectPartnerAddressTypeData.Organization
-                    (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "AT" && Regex("^(ATU)[0-9]{8}\$").matchEntire(partner.vat!!)==null) ||
+                    (!partner.vat.isNullOrEmpty() && partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "AT" && Regex("^(ATU)[0-9]{8}\$").matchEntire(partner.vat!!)==null) ||
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "DE" && Regex("^(DE)[0-9]{9}\$").matchEntire(partner.vat!!)==null) ||
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "HR" && Regex("^(HR)[0-9]{11}\$").matchEntire(partner.vat!!)==null) ||
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "CZ" && Regex("^(CZ)[0-9]{8,10}\$").matchEntire(partner.vat!!)==null) ||
@@ -741,7 +741,10 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "IT" && Regex("^(IT)[0-9]{11}\$").matchEntire(partner.vat!!)==null) ||
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "PL" && Regex("^(PL)[0-9]{10}\$").matchEntire(partner.vat!!)==null) ||
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "SK" && Regex("^(SK)[0-9]{10}\$").matchEntire(partner.vat!!)==null) ||
-                    (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "SI" && Regex("^(SI)[0-9]{8}\$").matchEntire(partner.vat!!)==null)
+                    (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "SI" && Regex("^(SI)[0-9]{8}\$").matchEntire(partner.vat!!)==null) ||
+                    (!partner.otherIdentifierNumber.isNullOrEmpty() && partner.otherIdentifierDescription.isNullOrEmpty()) ||
+                    (partner.otherIdentifierNumber.isNullOrEmpty() && !partner.otherIdentifierDescription.isNullOrEmpty()) ||
+                    (partner.partnerType != ProjectTargetGroupData.GeneralPublic)
 
         } -> {
             val errorMessages = mutableListOf<PreConditionCheckMessage>()
@@ -778,10 +781,41 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                         )
                     )
                 }
-                if (isFieldVisible(ApplicationFormFieldId.PARTNER_VAT_IDENTIFIER) && partner.vat.isNullOrEmpty()) {
+                // Amund - added OR other identifier
+                if (isFieldVisible(ApplicationFormFieldId.PARTNER_VAT_IDENTIFIER) && partner.vat.isNullOrEmpty() && partner.otherIdentifierNumber.isNullOrEmpty()) {
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
                             "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.vat.is.not.provided",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // Amund - if other id is used, then a descriptions should also be given
+                if (isFieldVisible(ApplicationFormFieldId.PARTNER_VAT_IDENTIFIER)
+                    && !partner.otherIdentifierNumber.isNullOrEmpty() && partner.otherIdentifierDescription.isNullOrEmpty()) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.other.id.needs.description",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // Amund - if other id description is filled in, then a id number should also be given
+                if (isFieldVisible(ApplicationFormFieldId.PARTNER_VAT_IDENTIFIER)
+                    && partner.otherIdentifierNumber.isNullOrEmpty() && !partner.otherIdentifierDescription.isNullOrEmpty()) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.no.other.id.for.description",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // Amund - The selected type of partner cannot be "General Public"
+                if (isFieldVisible(ApplicationFormFieldId.PARTNER_VAT_IDENTIFIER)
+                    && partner.partnerType != ProjectTargetGroupData.GeneralPublic ) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.type.cannot.be.general.public",
                             mapOf("name" to (partner.abbreviation))
                         )
                     )
@@ -808,7 +842,8 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                     val regexSI = Regex("^(SI)[0-9]{8}\$")
 
 
-                    if (address.type == ProjectPartnerAddressTypeData.Organization && !partner.vat.isNullOrEmpty()) {
+                    if (address.type == ProjectPartnerAddressTypeData.Organization
+                        && !partner.vat.isNullOrEmpty()) {
                         val countryCode: String? = address.nutsRegion2?.substringAfterLast("(")?.take(2)
                         if (countryCode == "AT" && regexAT.matchEntire(partner.vat!!) == null) {
                             errorMessages.add(
