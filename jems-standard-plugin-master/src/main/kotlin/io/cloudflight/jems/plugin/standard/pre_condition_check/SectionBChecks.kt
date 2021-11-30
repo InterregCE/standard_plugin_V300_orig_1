@@ -1186,7 +1186,7 @@ private fun checkIfPartnerPersonContentIsProvided(partners: Set<ProjectPartnerDa
                                 )
                             )
                         }
-                        if (isFieldVisible(ApplicationFormFieldId.PARTNER_LEGAL_REPRESENTATIVE_LAST_NAME) && contact.title.isNullOrBlank()) {
+                        if (isFieldVisible(ApplicationFormFieldId.PARTNER_LEGAL_REPRESENTATIVE_LAST_NAME) && contact.title.isNullOrBlank() ) {
                             errorMessages.add(
                                 buildErrorPreConditionCheckMessage(
                                     "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.representative.title.is.not.provided",
