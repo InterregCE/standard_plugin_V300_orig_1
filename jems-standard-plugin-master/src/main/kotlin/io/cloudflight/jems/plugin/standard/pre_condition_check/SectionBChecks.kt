@@ -212,7 +212,7 @@ private fun checkIfPartnerContributionEqualsToBudget(partners: Set<ProjectPartne
             partner.addresses.forEach { address ->
                 if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
                     && address.type == ProjectPartnerAddressTypeData.Organization
-                    && address.country in listOf("Österreich (AT)", "Deutschland (DE)")
+                    && address.country !in listOf("Italia (IT)", "Slovenija (SI)", "Slovensko (SK)", "Česko (CZ)", "Magyarország (HU)", "Polska (PL)", "Hrvatska (HR)")
                     && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 5) {
                     errorMessages.add(
                             buildErrorPreConditionCheckMessage(
@@ -744,7 +744,8 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "SI" && Regex("^(SI)[0-9]{8}\$").matchEntire(partner.vat!!)==null) ||
                     (!partner.otherIdentifierNumber.isNullOrEmpty() && partner.otherIdentifierDescription.isNullOrEmpty()) ||
                     (partner.otherIdentifierNumber.isNullOrEmpty() && !partner.otherIdentifierDescription.isNullOrEmpty()) ||
-                    (partner.partnerType != ProjectTargetGroupData.GeneralPublic)
+                    (partner.partnerType == ProjectTargetGroupData.GeneralPublic) ||
+                    (partner.partnerType == ProjectTargetGroupData.Sme && partner.partnerSubType == null)
 
         } -> {
             val errorMessages = mutableListOf<PreConditionCheckMessage>()
@@ -812,10 +813,21 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                 }
                 // Amund - The selected type of partner cannot be "General Public"
                 if (isFieldVisible(ApplicationFormFieldId.PARTNER_VAT_IDENTIFIER)
-                    && partner.partnerType != ProjectTargetGroupData.GeneralPublic ) {
+                    && partner.partnerType == ProjectTargetGroupData.GeneralPublic ) {
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
                             "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.type.cannot.be.general.public",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // Amund - If he selected type of partner is SME subtype is also mandatory
+                if (isFieldVisible(ApplicationFormFieldId.PARTNER_VAT_IDENTIFIER)
+                    && partner.partnerType == ProjectTargetGroupData.Sme
+                    && partner.partnerSubType == null) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.type.SME.must.have.subtype",
                             mapOf("name" to (partner.abbreviation))
                         )
                     )
@@ -950,8 +962,10 @@ private fun checkIfPartnerAddressContentIsProvided(partners: Set<ProjectPartnerD
                         address.city.isNullOrBlank())) ||
                     (address.type == ProjectPartnerAddressTypeData.Department &&
                         checkIfOneOfAddressFieldTouched(address)
-                    ) ||
-                            (partner.role.isLead && address.type == ProjectPartnerAddressTypeData.Organization && address.nutsRegion2?.substringAfterLast("(")?.take(2)!! !in listOf("AT", "IT", "HR", "CZ", "HU", "PL", "SI", "SK", "DE"))
+                    ) ||    // Amund - add CE check to build address error message
+                            (partner.role.isLead && address.type == ProjectPartnerAddressTypeData.Organization && address.nutsRegion2?.substringAfterLast("(")?.take(2)!! !in listOf("AT", "IT", "HR", "CZ", "HU", "PL", "SI", "SK", "DE")) ||
+                            (address.type == ProjectPartnerAddressTypeData.Organization && address.country !in listOf("Österreich (AT)", "Belgique/België (BE)", "Bulgaria (BG)", "Hrvatska (HR)", "Kýpros (CY)", "Česko (CZ)", "Danmark (DK)", "Eesti (EE)", "Suomi/Finland (FI)", "France (FR)", "Deutschland (DE)", "Elláda (EL)", "Magyarország (HU)", "Éire/Ireland (IE)", "Italia (IT)", "Latvija (LV)", "Lietuva (LT)", "Luxembourg (LU)", "Malta (MT)", "Nederland (NL)", "Polska (PL)", "Portugal (PT)", "România (RO)", "Slovensko (SK)", "Slovenija (SI)", "España (ES)", "Sverige (SE)")) ||
+                            (address.type == ProjectPartnerAddressTypeData.Organization && address.homepage.isNullOrBlank())
                 })
         } -> {
             val errorMessages = mutableListOf<PreConditionCheckMessage>()
@@ -1045,7 +1059,26 @@ private fun checkIfPartnerAddressContentIsProvided(partners: Set<ProjectPartnerD
                             )
                         )
                     }
-
+                    // test Amund - Partners must be in EU (other partners must be associated partners)
+                    if (address.type == ProjectPartnerAddressTypeData.Organization
+                        && address.country !in listOf("Österreich (AT)", "Belgique/België (BE)", "Bulgaria (BG)", "Hrvatska (HR)", "Kýpros (CY)", "Česko (CZ)", "Danmark (DK)", "Eesti (EE)", "Suomi/Finland (FI)", "France (FR)", "Deutschland (DE)", "Elláda (EL)", "Magyarország (HU)", "Éire/Ireland (IE)", "Italia (IT)", "Latvija (LV)", "Lietuva (LT)", "Luxembourg (LU)", "Malta (MT)", "Nederland (NL)", "Polska (PL)", "Portugal (PT)", "România (RO)", "Slovensko (SK)", "Slovenija (SI)", "España (ES)", "Sverige (SE)")){
+                        errorMessages.add(
+                            buildErrorPreConditionCheckMessage(
+                                "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.address.not.in.eu",
+                                mapOf("name" to (partner.abbreviation), "countrycode" to (address.nutsRegion2?.substringAfterLast("(")?.take(2)!!))
+                            )
+                        )
+                    }
+                    // test Amund - Partners must be in EU (other partners must be associated partners)
+                    if (address.type == ProjectPartnerAddressTypeData.Organization
+                        && address.homepage.isNullOrBlank()) {
+                        errorMessages.add(
+                            buildErrorPreConditionCheckMessage(
+                                "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.address.homepage.missing",
+                                mapOf("name" to (partner.abbreviation), "countrycode" to (address.nutsRegion2?.substringAfterLast("(")?.take(2)!!))
+                            )
+                        )
+                    }
 
                 }
             }
@@ -1073,7 +1106,8 @@ private fun checkIfPartnerPersonContentIsProvided(partners: Set<ProjectPartnerDa
                             (contact.firstName.isNullOrBlank() ||
                                 contact.lastName.isNullOrBlank() ||
                                 contact.telephone.isNullOrBlank() ||
-                                contact.email.isNullOrBlank())
+                                contact.email.isNullOrBlank()) ||
+                                contact.title.isNullOrBlank()
                     } ||
                     partner.contacts.any { contact ->
                         contact.type == ProjectContactTypeData.LegalRepresentative &&
@@ -1126,6 +1160,15 @@ private fun checkIfPartnerPersonContentIsProvided(partners: Set<ProjectPartnerDa
                                 )
                             )
                         }
+                        // Amund - check for contact person title
+                        if (isFieldVisible(ApplicationFormFieldId.PARTNER_CONTACT_PERSON_TELEPHONE) && contact.title.isNullOrBlank()) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.person.title.is.not.provided",
+                                    mapOf("name" to (partner.abbreviation))
+                                )
+                            )
+                        }
                     } else {
                         if (isFieldVisible(ApplicationFormFieldId.PARTNER_LEGAL_REPRESENTATIVE_FIRST_NAME) && contact.firstName.isNullOrBlank()) {
                             errorMessages.add(
@@ -1139,6 +1182,14 @@ private fun checkIfPartnerPersonContentIsProvided(partners: Set<ProjectPartnerDa
                             errorMessages.add(
                                 buildErrorPreConditionCheckMessage(
                                     "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.representative.last.name.is.not.provided",
+                                    mapOf("name" to (partner.abbreviation))
+                                )
+                            )
+                        }
+                        if (isFieldVisible(ApplicationFormFieldId.PARTNER_LEGAL_REPRESENTATIVE_LAST_NAME) && contact.title.isNullOrBlank()) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.representative.title.is.not.provided",
                                     mapOf("name" to (partner.abbreviation))
                                 )
                             )
