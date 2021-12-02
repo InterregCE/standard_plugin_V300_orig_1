@@ -21,6 +21,7 @@ import java.math.BigDecimal
 private const val SECTION_B_MESSAGES_PREFIX = "$MESSAGES_PREFIX.section.b"
 private const val SECTION_B_ERROR_MESSAGES_PREFIX = "$SECTION_B_MESSAGES_PREFIX.error"
 private const val SECTION_B_INFO_MESSAGES_PREFIX = "$SECTION_B_MESSAGES_PREFIX.info"
+private const val SECTION_B_WARNING_MESSAGES_PREFIX = "$SECTION_B_MESSAGES_PREFIX.warning"
 
 fun checkSectionB(sectionBData: ProjectDataSectionB): PreConditionCheckMessage {
     return buildPreConditionCheckMessage(
@@ -41,6 +42,8 @@ fun checkSectionB(sectionBData: ProjectDataSectionB): PreConditionCheckMessage {
         checkIfPartnerAssociatedOrganisationIsProvided(sectionBData.associatedOrganisations),
 
         checkIfStaffContentIsProvided(sectionBData.partners),
+
+        checkBudgetOptions(sectionBData.partners),
 
         checkIfTravelAndAccommodationContentIsProvided(sectionBData.partners),
 
@@ -197,86 +200,105 @@ private fun checkIfPartnerContributionEqualsToBudget(partners: Set<ProjectPartne
                     }
                 }
             }
-            // test Amund - BL2 15% mandatory when not using Other costs flat rate
-            if (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate == null
-                && partner.budget.projectPartnerOptions?.officeAndAdministrationOnStaffCostsFlatRate != 15) {
-                errorMessages.add(
-                    buildErrorPreConditionCheckMessage(
-                        "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.office.and.admin.not.15",
-                        mapOf("name" to (partner.abbreviation))
-                    )
-                )
-            }
-
+            // test Amund - BL2 15% mandatory when not using Other costs flat rate TODO: remove, duplicate with new section budget options
+            //if (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate == null
+            //    && partner.budget.projectPartnerOptions?.officeAndAdministrationOnStaffCostsFlatRate != 15) {
+            //    errorMessages.add(
+            //        buildErrorPreConditionCheckMessage(
+            //            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.office.and.admin.not.15",
+            //            mapOf("name" to (partner.abbreviation), "budget" to (partner.budget.projectPartnerBudgetTotalCost.toString()))
+            //        )
+            //    )
+            //}
+            // test Amund - Travel and accommodation flat rate is mandatory when not using Other costs flat rate
+            //if (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate == null
+            //    && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate == null) {
+            //    errorMessages.add(
+            //        buildErrorPreConditionCheckMessage(
+            //            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.travel.and.accommodation.not.selected",
+            //            mapOf("name" to (partner.abbreviation))
+            //        )
+            //    )
+            //}
+            // test Amund - If in the partner budget options Other costs Flat Rate  40% is selected, Staff costs have to be created (add button has to be ticked)
+            //if (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate != null
+            //    && partner.budget.projectPartnerBudgetCosts.staffCosts.isEmpty()) {
+            //    errorMessages.add(
+            //        buildErrorPreConditionCheckMessage(
+            //            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.staff.cost.not.selected",
+            //            mapOf("name" to (partner.abbreviation))
+            //        )
+            //    )
+            //}
             // test Amund - check flatrates depending on countries
-            partner.addresses.forEach { address ->
-                if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-                    && address.type == ProjectPartnerAddressTypeData.Organization
-                    && address.country !in listOf("Italia (IT)", "Slovenija (SI)", "Slovensko (SK)", "Česko (CZ)", "Magyarország (HU)", "Polska (PL)", "Hrvatska (HR)")
-                    && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 5) {
-                    errorMessages.add(
-                            buildErrorPreConditionCheckMessage(
-                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.AT.DE.travel.flat.rate",
-                                    mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-                            )
-                    )
-                }
-                else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-                    && address.type == ProjectPartnerAddressTypeData.Organization
-                    && address.country in listOf("Italia (IT)", "Slovenija (SI)", "Slovensko (SK)")
-                    && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 6) {
-                    errorMessages.add(
-                        buildErrorPreConditionCheckMessage(
-                            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.it.si.sk.travel.flat.rate",
-                            mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-                        )
-                    )
-                }
-                else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-                    && address.type == ProjectPartnerAddressTypeData.Organization
-                    && address.country == "Česko (CZ)"
-                    && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 7) {
-                    errorMessages.add(
-                        buildErrorPreConditionCheckMessage(
-                            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.cz.travel.flat.rate",
-                            mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-                        )
-                    )
-                }
-                else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-                    && address.type == ProjectPartnerAddressTypeData.Organization
-                    && address.country == "Magyarország (HU)"
-                    && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 8) {
-                    errorMessages.add(
-                        buildErrorPreConditionCheckMessage(
-                            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.hu.travel.flat.rate",
-                            mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-                        )
-                    )
-                }
-                else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-                    && address.type == ProjectPartnerAddressTypeData.Organization
-                    && address.country == "Polska (PL)"
-                    && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 9) {
-                    errorMessages.add(
-                        buildErrorPreConditionCheckMessage(
-                            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.pl.travel.flat.rate",
-                            mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-                        )
-                    )
-                }
-                else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-                    && address.type == ProjectPartnerAddressTypeData.Organization
-                    && address.country == "Hrvatska (HR)"
-                    && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 11) {
-                    errorMessages.add(
-                        buildErrorPreConditionCheckMessage(
-                            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.hr.travel.flat.rate",
-                            mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-                        )
-                    )
-                }
-            }
+            //partner.addresses.forEach { address ->
+            //    if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+            //        && address.type == ProjectPartnerAddressTypeData.Organization
+            //        && address.country !in listOf("Italia (IT)", "Slovenija (SI)", "Slovensko (SK)", "Česko (CZ)", "Magyarország (HU)", "Polska (PL)", "Hrvatska (HR)")
+            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 5) {
+            //        errorMessages.add(
+            //                buildErrorPreConditionCheckMessage(
+            //                        "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.AT.DE.travel.flat.rate",
+            //                        mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+            //                )
+            //        )
+            //    }
+            //    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+            //        && address.type == ProjectPartnerAddressTypeData.Organization
+            //        && address.country in listOf("Italia (IT)", "Slovenija (SI)", "Slovensko (SK)")
+            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 6) {
+            //        errorMessages.add(
+            //            buildErrorPreConditionCheckMessage(
+            //                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.it.si.sk.travel.flat.rate",
+            //                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+            //            )
+            //        )
+            //    }
+            //    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+            //        && address.type == ProjectPartnerAddressTypeData.Organization
+            //        && address.country == "Česko (CZ)"
+            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 7) {
+            //        errorMessages.add(
+            //            buildErrorPreConditionCheckMessage(
+            //                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.cz.travel.flat.rate",
+            //                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+            //            )
+            //        )
+            //    }
+            //    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+            //        && address.type == ProjectPartnerAddressTypeData.Organization
+            //        && address.country == "Magyarország (HU)"
+            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 8) {
+            //        errorMessages.add(
+            //            buildErrorPreConditionCheckMessage(
+            //                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.hu.travel.flat.rate",
+            //                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+            //            )
+            //        )
+            //    }
+            //    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+            //        && address.type == ProjectPartnerAddressTypeData.Organization
+            //        && address.country == "Polska (PL)"
+            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 9) {
+            //        errorMessages.add(
+            //            buildErrorPreConditionCheckMessage(
+            //                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.pl.travel.flat.rate",
+            //                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+            //            )
+            //        )
+            //    }
+            //    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+            //        && address.type == ProjectPartnerAddressTypeData.Organization
+            //        && address.country == "Hrvatska (HR)"
+            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 11) {
+            //        errorMessages.add(
+            //            buildErrorPreConditionCheckMessage(
+            //                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.hr.travel.flat.rate",
+            //                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+            //            )
+            //        )
+            //    }
+            // }
 
         }
         if (errorMessages.size > 0) {
@@ -406,6 +428,158 @@ private fun checkIfStaffContentIsProvided(partners: Set<ProjectPartnerData>) =
         }
         else -> null
     }
+
+// Amund TODO: Add new Project budget options section:
+private fun checkBudgetOptions(partners: Set<ProjectPartnerData>) =
+    when {
+        partners.any { partner ->
+            (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate == null && partner.budget.projectPartnerOptions?.officeAndAdministrationOnStaffCostsFlatRate != 15) ||
+                    (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate == null && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate == null) ||
+                    (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate != null && partner.budget.projectPartnerBudgetCosts.staffCosts.isEmpty()) ||
+                    (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                            && partner.addresses.elementAt(0).type == ProjectPartnerAddressTypeData.Organization
+                            && partner.addresses.elementAt(0).country !in listOf("Italia (IT)", "Slovenija (SI)", "Slovensko (SK)", "Česko (CZ)", "Magyarország (HU)", "Polska (PL)", "Hrvatska (HR)")
+                            && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 5) ||
+                    (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                            && partner.addresses.elementAt(0).type == ProjectPartnerAddressTypeData.Organization
+                            && partner.addresses.elementAt(0).country in listOf("Italia (IT)", "Slovenija (SI)", "Slovensko (SK)")
+                            && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 6) ||
+                    (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                            && partner.addresses.elementAt(0).type == ProjectPartnerAddressTypeData.Organization
+                            && partner.addresses.elementAt(0).country == "Česko (CZ)"
+                            && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 7) ||
+                    (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                            && partner.addresses.elementAt(0).type == ProjectPartnerAddressTypeData.Organization
+                            && partner.addresses.elementAt(0).country == "Magyarország (HU)"
+                            && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 8) ||
+                    (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                            && partner.addresses.elementAt(0).type == ProjectPartnerAddressTypeData.Organization
+                            && partner.addresses.elementAt(0).country == "Polska (PL)"
+                            && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 9) ||
+                    (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                            && partner.addresses.elementAt(0).type == ProjectPartnerAddressTypeData.Organization
+                            && partner.addresses.elementAt(0).country == "Hrvatska (HR)"
+                            && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 11)
+
+
+
+        } -> {
+            val errorMessages = mutableListOf<PreConditionCheckMessage>()
+            partners.forEach { partner ->
+                if (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate == null
+                    && partner.budget.projectPartnerOptions?.officeAndAdministrationOnStaffCostsFlatRate != 15) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.options.office.and.admin.not.15",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // test Amund - Travel and accommodation flat rate is mandatory when not using Other costs flat rate
+                if (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate == null
+                    && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate == null) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.options.travel.and.accommodation.not.selected",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // test Amund - If in the partner budget options Other costs Flat Rate  40% is selected, Staff costs have to be created (add button has to be ticked)
+                if (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate != null
+                    && partner.budget.projectPartnerBudgetCosts.staffCosts.isEmpty()) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.options.staff.cost.not.selected",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // test Amund - check flatrates depending on countries
+                partner.addresses.forEach { address ->
+                    if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                        && address.type == ProjectPartnerAddressTypeData.Organization
+                        && address.country !in listOf("Italia (IT)", "Slovenija (SI)", "Slovensko (SK)", "Česko (CZ)", "Magyarország (HU)", "Polska (PL)", "Hrvatska (HR)")
+                        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 5) {
+                        errorMessages.add(
+                            buildErrorPreConditionCheckMessage(
+                                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.options.wrong.AT.DE.travel.flat.rate",
+                                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+                            )
+                        )
+                    }
+                    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                        && address.type == ProjectPartnerAddressTypeData.Organization
+                        && address.country in listOf("Italia (IT)", "Slovenija (SI)", "Slovensko (SK)")
+                        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 6) {
+                        errorMessages.add(
+                            buildErrorPreConditionCheckMessage(
+                                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.options.wrong.it.si.sk.travel.flat.rate",
+                                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+                            )
+                        )
+                    }
+                    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                        && address.type == ProjectPartnerAddressTypeData.Organization
+                        && address.country == "Česko (CZ)"
+                        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 7) {
+                        errorMessages.add(
+                            buildErrorPreConditionCheckMessage(
+                                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.options.wrong.cz.travel.flat.rate",
+                                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+                            )
+                        )
+                    }
+                    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                        && address.type == ProjectPartnerAddressTypeData.Organization
+                        && address.country == "Magyarország (HU)"
+                        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 8) {
+                        errorMessages.add(
+                            buildErrorPreConditionCheckMessage(
+                                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.options.wrong.hu.travel.flat.rate",
+                                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+                            )
+                        )
+                    }
+                    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                        && address.type == ProjectPartnerAddressTypeData.Organization
+                        && address.country == "Polska (PL)"
+                        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 9) {
+                        errorMessages.add(
+                            buildErrorPreConditionCheckMessage(
+                                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.options.wrong.pl.travel.flat.rate",
+                                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+                            )
+                        )
+                    }
+                    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
+                        && address.type == ProjectPartnerAddressTypeData.Organization
+                        && address.country == "Hrvatska (HR)"
+                        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 11) {
+                        errorMessages.add(
+                            buildErrorPreConditionCheckMessage(
+                                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.options.wrong.hr.travel.flat.rate",
+                                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
+                            )
+                        )
+                    }
+                }
+            }
+            if (errorMessages.count() > 0) {
+                buildErrorPreConditionCheckMessages(
+                    "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.options",
+                    messageArgs = emptyMap(),
+                    errorMessages
+                )
+            }
+            else
+            {
+                null
+            }
+        }
+        else -> null
+    }
+//end new section Project Budget options
 
 private fun checkIfTravelAndAccommodationContentIsProvided(partners: Set<ProjectPartnerData>) =
     when {
@@ -782,7 +956,7 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                         )
                     )
                 }
-                // Amund - added OR other identifier
+                // Amund - added 'OR other identifier'
                 if (isFieldVisible(ApplicationFormFieldId.PARTNER_VAT_IDENTIFIER) && partner.vat.isNullOrEmpty() && partner.otherIdentifierNumber.isNullOrEmpty()) {
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
@@ -1069,17 +1243,40 @@ private fun checkIfPartnerAddressContentIsProvided(partners: Set<ProjectPartnerD
                             )
                         )
                     }
-                    // test Amund - Partners must be in EU (other partners must be associated partners)
+                    // test Amund - homepage must be added
                     if (address.type == ProjectPartnerAddressTypeData.Organization
                         && address.homepage.isNullOrBlank()) {
                         errorMessages.add(
                             buildErrorPreConditionCheckMessage(
                                 "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.address.homepage.missing",
-                                mapOf("name" to (partner.abbreviation), "countrycode" to (address.nutsRegion2?.substringAfterLast("(")?.take(2)!!))
+                                mapOf("name" to (partner.abbreviation))
                             )
                         )
                     }
-
+                    // test Amund - if lead partner from IT or DE but outside programme area, show warning TODO: now
+                    if (partner.role.isLead
+                        && address.type == ProjectPartnerAddressTypeData.Organization
+                        && address.nutsRegion2?.substringAfterLast("(")?.take(2) == "DE"
+                        && address.nutsRegion2?.substringAfterLast("(")?.substringBefore(')') !in listOf("DE11","DE12","DE13","DE14","DE21","DE22","DE23","DE24","DE25","DE26","DE27","DE30","DE40","DE80","DE91")) {
+                        errorMessages.add(
+                            buildWarningPreConditionCheckMessage(
+                                "$SECTION_B_WARNING_MESSAGES_PREFIX.project.partner.DE.lp.not.in.programme.area",
+                                mapOf("name" to (partner.abbreviation), "countrycode" to (address.nutsRegion2?.substringAfterLast("(")?.substringBefore(')')!!))
+                            )
+                        )
+                    }
+                    // test Amund - if lead partner from IT or DE but outside programme area, show warning TODO: now
+                    if (partner.role.isLead
+                        && address.type == ProjectPartnerAddressTypeData.Organization
+                        && address.nutsRegion2?.substringAfterLast("(")?.take(2) == "IT"
+                        && address.nutsRegion2?.substringAfterLast("(")?.substringBefore(')') !in listOf("ITC1","ITC2","ITC3","ITC4","ITH1","ITH2","ITH3","ITH4","ITH5")) {
+                        errorMessages.add(
+                            buildWarningPreConditionCheckMessage(
+                                "$SECTION_B_WARNING_MESSAGES_PREFIX.project.partner.IT.lp.not.in.programme.area",
+                                mapOf("name" to (partner.abbreviation), "countrycode" to (address.nutsRegion2?.substringAfterLast("(")?.substringBefore(')')!!))
+                            )
+                        )
+                    }
                 }
             }
             if (errorMessages.count() > 0) {
@@ -1226,6 +1423,17 @@ private fun checkIfPartnerMotivationContentIsProvided(partners: Set<ProjectPartn
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
                             "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.motivation.role.is.not.provided",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // Amund - LP need to fill in capacity
+                if (isFieldVisible(ApplicationFormFieldId.PARTNER_MOTIVATION_ROLE)
+                    && partner.motivation?.organizationExperience.isNotFullyTranslated(CallDataContainer.get().inputLanguages)
+                    && partner.role.isLead) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.experience.role.is.not.provided",
                             mapOf("name" to (partner.abbreviation))
                         )
                     )

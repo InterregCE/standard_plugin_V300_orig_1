@@ -63,6 +63,12 @@ fun buildErrorPreConditionCheckMessages(
 ): PreConditionCheckMessage =
     buildPreConditionCheckMessage(messageKey, messageArgs, MessageType.ERROR, checkResults)
 
+// Amund Added warning message
+fun buildWarningPreConditionCheckMessage(
+    messageKey: String, messageArgs: Map<String, String> = emptyMap(), vararg checkResults: PreConditionCheckMessage?
+): PreConditionCheckMessage =
+    buildPreConditionCheckMessage(messageKey, messageArgs, MessageType.WARNING, *checkResults)
+
 fun Set<InputTranslationData>?.isNotFullyTranslated(mandatoryLanguages: Set<SystemLanguageData>): Boolean {
     return !this.isFullyTranslated(mandatoryLanguages)
 }
