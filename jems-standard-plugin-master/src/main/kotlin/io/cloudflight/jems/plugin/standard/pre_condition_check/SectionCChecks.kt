@@ -13,6 +13,7 @@ import io.cloudflight.jems.plugin.contract.models.project.sectionC.partnership.P
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.relevance.ProjectRelevanceBenefitData
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.relevance.ProjectRelevanceStrategyData
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.relevance.ProjectRelevanceSynergyData
+import io.cloudflight.jems.plugin.contract.models.project.sectionC.relevance.ProjectTargetGroupData
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.results.ProjectResultData
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.workpackage.ProjectWorkPackageData
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.workpackage.WorkPackageActivityData
@@ -25,6 +26,7 @@ import java.math.BigDecimal
 
 private const val SECTION_C_MESSAGES_PREFIX = "$MESSAGES_PREFIX.section.c"
 private const val SECTION_C_ERROR_MESSAGES_PREFIX = "$SECTION_C_MESSAGES_PREFIX.error"
+private const val SECTION_C_WARNING_MESSAGES_PREFIX = "$SECTION_C_MESSAGES_PREFIX.warning"
 private const val SECTION_C_INFO_MESSAGES_PREFIX = "$SECTION_C_MESSAGES_PREFIX.info"
 
 fun checkSectionC(sectionCData: ProjectDataSectionC?): PreConditionCheckMessage {
@@ -33,7 +35,9 @@ fun checkSectionC(sectionCData: ProjectDataSectionC?): PreConditionCheckMessage 
 
         buildPreConditionCheckMessage(
             messageKey = "$SECTION_C_INFO_MESSAGES_PREFIX.project.c1", messageArgs = emptyMap(),
-            checkIfProjectOverallObjectiveIsProvided(sectionCData?.projectOverallObjective)
+            checkIfProjectOverallObjectiveIsProvided(sectionCData?.projectOverallObjective),
+
+            checkIfProjectOverallObjectiveIsFilledIn(sectionCData?.projectOverallObjective)
         ),
 
         buildPreConditionCheckMessage(
@@ -48,6 +52,8 @@ fun checkSectionC(sectionCData: ProjectDataSectionC?): PreConditionCheckMessage 
             checkIfAtLeastOneTargetGroupIsAdded(sectionCData?.projectRelevance?.projectBenefits),
 
             checkIfSpecificationIsProvidedForAllTargetGroups(sectionCData?.projectRelevance?.projectBenefits),
+
+            checkIfTargetGroupAddedSeveralTime(sectionCData?.projectRelevance?.projectBenefits),
 
             checkIfAtLeastOneStrategyIsAdded(sectionCData?.projectRelevance?.projectStrategies),
 
@@ -126,6 +132,13 @@ private fun checkIfProjectOverallObjectiveIsProvided(projectOverallObjectiveData
         else -> null
     }
 
+private fun checkIfProjectOverallObjectiveIsFilledIn(projectOverallObjectiveData: ProjectOverallObjectiveData?) =
+    when {
+        !isFieldVisible(ApplicationFormFieldId.PROJECT_OVERALL_OBJECTIVE) -> null
+        projectOverallObjectiveData!!.overallObjective.isEmpty() -> buildErrorPreConditionCheckMessage("$SECTION_C_ERROR_MESSAGES_PREFIX.project.overall.objective.not.filled.in")
+        else -> null
+    }
+
 private fun checkIfTerritorialChallengeGroupIsProvided(territorialChallenge: Set<InputTranslationData>?) =
     when {
         !isFieldVisible(ApplicationFormFieldId.PROJECT_TERRITORIAL_CHALLENGES) -> null
@@ -163,6 +176,29 @@ private fun checkIfSpecificationIsProvidedForAllTargetGroups(projectBenefits: Li
         projectBenefits.isNullOrEmpty() -> null
         projectBenefits.any { it.specification.isNotFullyTranslated(CallDataContainer.get().inputLanguages) }
         -> buildErrorPreConditionCheckMessage("$SECTION_C_ERROR_MESSAGES_PREFIX.specifications.for.all.target.groups.should.be.added")
+        else -> null
+    }
+
+
+// Amund - Warning for several of the same target groups TODO: make into warning
+private fun checkIfTargetGroupAddedSeveralTime(projectBenefits: List<ProjectRelevanceBenefitData>?) =
+    when {
+        projectBenefits != null  -> {
+            val groups = mutableListOf<String>()
+            projectBenefits.forEach { projectBenefit ->
+                groups.add(projectBenefit.group.toString())
+            }
+            val dupes = groups.groupingBy { it }.eachCount().filter { it.value > 1 }
+            if (dupes.isNotEmpty()) {
+                buildWarningPreConditionCheckMessage("$SECTION_C_WARNING_MESSAGES_PREFIX.target.group.used.several.times"
+                    , mapOf("groups" to (groups.toString()), "dupes" to (dupes.toString()) ))
+            }
+            else {
+                null
+            }
+
+        }
+
         else -> null
     }
 

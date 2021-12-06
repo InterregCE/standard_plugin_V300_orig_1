@@ -73,7 +73,7 @@ fun checkSectionB(sectionBData: ProjectDataSectionB): PreConditionCheckMessage {
         checkIfStateAidIsValid(sectionBData.partners)
     )
 }
-// Amund - Updated from at least 1 to at least 3 TODO: find solution for EGTC projects (can have only one partner)
+// Amund - Updated from at least 1 to at least 3
 //private fun checkIfAtLeastThreePartnersAreAdded(partners: Set<ProjectPartnerData>?) =
 //    when {
 //        partners?.size!! <= 1 -> buildErrorPreConditionCheckMessage("$SECTION_B_ERROR_MESSAGES_PREFIX.at.least.three.partners.should.be.added")
@@ -1530,7 +1530,7 @@ private fun checkIfPartnerAssociatedOrganisationIsProvided(associatedOrganizatio
                                     (contact.firstName.isNullOrBlank() ||
                                             contact.lastName.isNullOrBlank())
                         }*/
-                    ) || (associatedOrganization.contacts.isEmpty() || associatedOrganization.contacts.size < 2 || (associatedOrganization.contacts.size == 1 && associatedOrganization.contacts.elementAt(0).type == ProjectContactTypeData.LegalRepresentative))
+                    ) || (associatedOrganization.contacts.isEmpty() || (associatedOrganization.contacts.size == 1 && associatedOrganization.contacts.elementAt(0).type == ProjectContactTypeData.LegalRepresentative))
         } -> {
             val errorMessages = mutableListOf<PreConditionCheckMessage>()
             associatedOrganizations.forEach { associatedOrganization ->
@@ -1644,8 +1644,8 @@ private fun checkIfPartnerAssociatedOrganisationIsProvided(associatedOrganizatio
                         )
                     )
                 }
-                // TODO: error messages not build if neither legal representative or contect person filled in (list if contacts empty)
-                if (associatedOrganization.contacts.isEmpty() || associatedOrganization.contacts.size < 2 || associatedOrganization.contacts.size == 1)
+                // Amund updated to ignore legal rep
+                if (associatedOrganization.contacts.isEmpty() || (associatedOrganization.contacts.size == 1 && associatedOrganization.contacts.elementAt(0).type == ProjectContactTypeData.LegalRepresentative))
                 {
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
