@@ -12,6 +12,7 @@ import io.cloudflight.jems.plugin.contract.models.project.sectionB.partners.Proj
 import io.cloudflight.jems.plugin.contract.models.project.sectionB.partners.ProjectPartnerData
 import io.cloudflight.jems.plugin.contract.models.project.sectionB.partners.ProjectPartnerRoleData
 import io.cloudflight.jems.plugin.contract.models.project.sectionB.partners.budget.ProjectPartnerCoFinancingFundTypeData
+import io.cloudflight.jems.plugin.contract.models.project.sectionB.partners.budget.ProjectPartnerContributionStatusData
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.relevance.ProjectTargetGroupData
 import io.cloudflight.jems.plugin.contract.pre_condition_check.models.PreConditionCheckMessage
 import io.cloudflight.jems.plugin.standard.pre_condition_check.helpers.CallDataContainer
@@ -26,8 +27,10 @@ private const val SECTION_B_WARNING_MESSAGES_PREFIX = "$SECTION_B_MESSAGES_PREFI
 fun checkSectionB(sectionBData: ProjectDataSectionB): PreConditionCheckMessage {
     return buildPreConditionCheckMessage(
         messageKey = "$SECTION_B_MESSAGES_PREFIX.header", messageArgs = emptyMap(),
+        // Amund updated wording
+        //checkIfAtLeastThreePartnersAreAdded(sectionBData.partners),
 
-        checkIfAtLeastOnePartnerIsAdded(sectionBData.partners),
+        checkParnterComposition(sectionBData.partners),
 
         checkIfExactlyOneLeadPartnerIsAdded(sectionBData.partners),
 
@@ -41,8 +44,10 @@ fun checkSectionB(sectionBData: ProjectDataSectionB): PreConditionCheckMessage {
 
         checkIfPartnerAssociatedOrganisationIsProvided(sectionBData.associatedOrganisations),
 
-        checkIfStaffContentIsProvided(sectionBData.partners),
+        checkGeneralBudget(sectionBData.partners),
 
+        checkIfStaffContentIsProvided(sectionBData.partners),
+        // Amund
         checkBudgetOptions(sectionBData.partners),
 
         checkIfTravelAndAccommodationContentIsProvided(sectionBData.partners),
@@ -68,12 +73,12 @@ fun checkSectionB(sectionBData: ProjectDataSectionB): PreConditionCheckMessage {
         checkIfStateAidIsValid(sectionBData.partners)
     )
 }
-
-private fun checkIfAtLeastOnePartnerIsAdded(partners: Set<ProjectPartnerData>?) =
-    when {
-        partners.isNullOrEmpty() -> buildErrorPreConditionCheckMessage("$SECTION_B_ERROR_MESSAGES_PREFIX.at.least.one.partner.should.be.added")
-        else -> buildInfoPreConditionCheckMessage("$SECTION_B_INFO_MESSAGES_PREFIX.at.least.one.partner.is.added")
-    }
+// Amund - Updated from at least 1 to at least 3 TODO: find solution for EGTC projects (can have only one partner)
+//private fun checkIfAtLeastThreePartnersAreAdded(partners: Set<ProjectPartnerData>?) =
+//    when {
+//        partners?.size!! <= 1 -> buildErrorPreConditionCheckMessage("$SECTION_B_ERROR_MESSAGES_PREFIX.at.least.three.partners.should.be.added")
+//        else -> buildInfoPreConditionCheckMessage("$SECTION_B_INFO_MESSAGES_PREFIX.at.least.three.partners.are.added")
+//    }
 
 private fun checkIfExactlyOneLeadPartnerIsAdded(partners: Set<ProjectPartnerData>?) =
     when {
@@ -95,6 +100,80 @@ private fun checkIfTotalBudgetIsGreaterThanZero(partners: Set<ProjectPartnerData
         partners.sumOf { it.budget.projectPartnerBudgetTotalCost } <= BigDecimal.ZERO ->
             buildErrorPreConditionCheckMessage("$SECTION_B_ERROR_MESSAGES_PREFIX.total.budget.should.be.greater.than.zero")
         else -> buildInfoPreConditionCheckMessage("$SECTION_B_INFO_MESSAGES_PREFIX.total.budget.is.greater.than.zero")
+    }
+
+// Amund - CE check for partner compsition:
+//  - At least 3 partners (updates check above)
+//  - From at least 3 countries
+//  - At least 2 partners from CE regions
+//  - If partner type = EGTC => at least 1 partner EGTC must be in CE region
+private fun checkParnterComposition(partners: Set<ProjectPartnerData>) =
+   when {
+       partners.isNotEmpty() ->
+       {
+           val errorMessages = mutableListOf<PreConditionCheckMessage>()
+           val countries = mutableListOf<String>()
+           val CECountries = mutableListOf<String>()
+           var isEGTC = false
+           partners.forEach { partner ->
+               if (partner.partnerType == ProjectTargetGroupData.Egtc && partner.role.isLead) {
+                    isEGTC = true
+               }
+               partner.addresses.forEach { address ->
+                   if (address.type == ProjectPartnerAddressTypeData.Organization){
+                       countries.add(address.country.toString())
+                   }
+                   if (address.type == ProjectPartnerAddressTypeData.Organization && address.country in listOf("Magyarország (HU)","Italia (IT)","Slovenija (SI)","Slovensko (SK)","Česko (CZ)","Polska (PL)","Hrvatska (HR)","Deutschland (DE)","Österreich (AT)")) {
+                       CECountries.add(address.country.toString())
+                   }
+               }
+           }
+           if (countries.distinct().size < 3 && !isEGTC) {
+               errorMessages.add(
+                   buildErrorPreConditionCheckMessage(
+                       "$SECTION_B_ERROR_MESSAGES_PREFIX.partner.composition.not.three.countries",
+                       mapOf("countries" to (countries.toString()))
+                   )
+               )
+           }
+           if (CECountries.distinct().size < 2 && !isEGTC) {
+               errorMessages.add(
+                   buildErrorPreConditionCheckMessage(
+                       "$SECTION_B_ERROR_MESSAGES_PREFIX.partner.composition.not.two.CE.countries",
+                       mapOf("CECountries" to (CECountries.toString()))
+                   )
+               )
+           }
+           if (isEGTC) {
+               partners.forEach { partner ->
+                   if (partner.role.isLead) {
+                       partner.addresses.forEach { address ->
+                           if (address.type == ProjectPartnerAddressTypeData.Organization && address.country !in listOf("Magyarország (HU)","Italia (IT)","Slovenija (SI)","Slovensko (SK)","Česko (CZ)","Polska (PL)","Hrvatska (HR)","Deutschland (DE)","Österreich (AT)")) {
+                               errorMessages.add(
+                                   buildErrorPreConditionCheckMessage(
+                                       "$SECTION_B_ERROR_MESSAGES_PREFIX.partner.composition.EGTC.not.in.CE.area",
+                                       mapOf("CECountries" to (CECountries.toString()))
+                                   )
+                               )
+                           }
+                       }
+                   }
+               }
+           }
+           if (errorMessages.count() > 0) {
+               buildErrorPreConditionCheckMessages(
+                   "$SECTION_B_ERROR_MESSAGES_PREFIX.partner.composition",
+                   messageArgs = emptyMap(),
+                   errorMessages
+               )
+           }
+           else
+           {
+               null
+           }
+       }
+
+        else -> null
     }
 
 private fun checkIfCoFinancingContentIsProvided(partners: Set<ProjectPartnerData>) =
@@ -200,106 +279,23 @@ private fun checkIfPartnerContributionEqualsToBudget(partners: Set<ProjectPartne
                     }
                 }
             }
-            // test Amund - BL2 15% mandatory when not using Other costs flat rate TODO: remove, duplicate with new section budget options
-            //if (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate == null
-            //    && partner.budget.projectPartnerOptions?.officeAndAdministrationOnStaffCostsFlatRate != 15) {
-            //    errorMessages.add(
-            //        buildErrorPreConditionCheckMessage(
-            //            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.office.and.admin.not.15",
-            //            mapOf("name" to (partner.abbreviation), "budget" to (partner.budget.projectPartnerBudgetTotalCost.toString()))
-            //        )
-            //    )
-            //}
-            // test Amund - Travel and accommodation flat rate is mandatory when not using Other costs flat rate
-            //if (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate == null
-            //    && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate == null) {
-            //    errorMessages.add(
-            //        buildErrorPreConditionCheckMessage(
-            //            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.travel.and.accommodation.not.selected",
-            //            mapOf("name" to (partner.abbreviation))
-            //        )
-            //    )
-            //}
-            // test Amund - If in the partner budget options Other costs Flat Rate  40% is selected, Staff costs have to be created (add button has to be ticked)
-            //if (partner.budget.projectPartnerOptions?.otherCostsOnStaffCostsFlatRate != null
-            //    && partner.budget.projectPartnerBudgetCosts.staffCosts.isEmpty()) {
-            //    errorMessages.add(
-            //        buildErrorPreConditionCheckMessage(
-            //            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.staff.cost.not.selected",
-            //            mapOf("name" to (partner.abbreviation))
-            //        )
-            //    )
-            //}
-            // test Amund - check flatrates depending on countries
-            //partner.addresses.forEach { address ->
-            //    if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-            //        && address.type == ProjectPartnerAddressTypeData.Organization
-            //        && address.country !in listOf("Italia (IT)", "Slovenija (SI)", "Slovensko (SK)", "Česko (CZ)", "Magyarország (HU)", "Polska (PL)", "Hrvatska (HR)")
-            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 5) {
-            //        errorMessages.add(
-            //                buildErrorPreConditionCheckMessage(
-            //                        "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.AT.DE.travel.flat.rate",
-            //                        mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-            //                )
-            //        )
-            //    }
-            //    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-            //        && address.type == ProjectPartnerAddressTypeData.Organization
-            //        && address.country in listOf("Italia (IT)", "Slovenija (SI)", "Slovensko (SK)")
-            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 6) {
-            //        errorMessages.add(
-            //            buildErrorPreConditionCheckMessage(
-            //                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.it.si.sk.travel.flat.rate",
-            //                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-            //            )
-            //        )
-            //    }
-            //    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-            //        && address.type == ProjectPartnerAddressTypeData.Organization
-            //        && address.country == "Česko (CZ)"
-            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 7) {
-            //        errorMessages.add(
-            //            buildErrorPreConditionCheckMessage(
-            //                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.cz.travel.flat.rate",
-            //                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-            //            )
-            //        )
-            //    }
-            //    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-            //        && address.type == ProjectPartnerAddressTypeData.Organization
-            //        && address.country == "Magyarország (HU)"
-            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 8) {
-            //        errorMessages.add(
-            //            buildErrorPreConditionCheckMessage(
-            //                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.hu.travel.flat.rate",
-            //                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-            //            )
-            //        )
-            //    }
-            //    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-            //        && address.type == ProjectPartnerAddressTypeData.Organization
-            //        && address.country == "Polska (PL)"
-            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 9) {
-            //        errorMessages.add(
-            //            buildErrorPreConditionCheckMessage(
-            //                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.pl.travel.flat.rate",
-            //                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-            //            )
-            //        )
-            //    }
-            //    else if (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != null
-            //        && address.type == ProjectPartnerAddressTypeData.Organization
-            //        && address.country == "Hrvatska (HR)"
-            //        && partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate != 11) {
-            //        errorMessages.add(
-            //            buildErrorPreConditionCheckMessage(
-            //                "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.wrong.hr.travel.flat.rate",
-            //                mapOf("name" to (partner.abbreviation), "flatrate" to (partner.budget.projectPartnerOptions?.travelAndAccommodationOnStaffCostsFlatRate.toString()))
-            //            )
-            //        )
-            //    }
-            // }
-
+            // Amund check legal status match of Partner and partner contribution
+            if (!partner.budget.projectPartnerCoFinancing.partnerContributions.isEmpty()) {
+                if ((partner.legalStatusId.toString() == "1" && partner.budget.projectPartnerCoFinancing.partnerContributions.elementAt(0).status == ProjectPartnerContributionStatusData.Private) ||
+                    (partner.legalStatusId.toString() == "2" && partner.budget.projectPartnerCoFinancing.partnerContributions.elementAt(0).status == ProjectPartnerContributionStatusData.Public)
+                ) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.legal.status.not.matching",
+                            mapOf(
+                                "name" to (partner.abbreviation),
+                                "partner" to (partner.legalStatusId.toString()),
+                                "contribution" to (partner.budget.projectPartnerCoFinancing.partnerContributions.elementAt(0).status.toString())
+                            )
+                        )
+                    )
+                }
+            }
         }
         if (errorMessages.size > 0) {
             buildErrorPreConditionCheckMessages(
@@ -359,6 +355,57 @@ private fun checkIfPeriodsAmountSumUpToBudgetEntrySum(partners: Set<ProjectPartn
         }
         else -> null
     }
+
+// Amund General budget checks
+private fun checkGeneralBudget(partners: Set<ProjectPartnerData>) =
+    when {
+        partners.any { partner ->
+            (partner.budget.projectPartnerBudgetTotalCost <= BigDecimal.ZERO)
+        } -> {
+            val errorMessages = mutableListOf<PreConditionCheckMessage>()
+            partners.forEach { partner ->
+                if (partner.budget.projectPartnerBudgetTotalCost <= BigDecimal.ZERO) {
+                    errorMessages.add(
+                        buildWarningPreConditionCheckMessage(
+                            "$SECTION_B_WARNING_MESSAGES_PREFIX.budget.is.zero",
+                            mapOf("name" to (partner.abbreviation), "budget" to (partner.budget.projectPartnerBudgetTotalCost.toString()), "legal" to (partner.legalStatusId.toString()))
+                        )
+                    )
+                }
+                // if total of infrastructure and equipment is over 25000, add a warning
+                var totalSum = 0.00
+                partner.budget.projectPartnerBudgetCosts.equipmentCosts.forEach { equipment ->
+                    totalSum += equipment.rowSum?.toDouble()!!
+                }
+                partner.budget.projectPartnerBudgetCosts.infrastructureCosts.forEach { infrastructure ->
+                    totalSum += infrastructure.rowSum?.toDouble()!!
+                }
+                if (totalSum > 25000) {
+                    errorMessages.add(
+                        buildWarningPreConditionCheckMessage(
+                            "$SECTION_B_WARNING_MESSAGES_PREFIX.infrastructure.and.equipment.over.25000",
+                            mapOf("name" to (partner.abbreviation), "sum" to (totalSum.toString()))
+                        )
+                    )
+                }
+            }
+            if (errorMessages.count() > 0) {
+                buildWarningPreConditionCheckMessages(
+                    "$SECTION_B_WARNING_MESSAGES_PREFIX.budget.general",
+                    messageArgs = emptyMap(),
+                    errorMessages
+                )
+
+
+            }
+            else
+            {
+                null
+            }
+        }
+        else -> null
+    }
+// Amund end new section
 
 private fun checkIfStaffContentIsProvided(partners: Set<ProjectPartnerData>) =
     when {
@@ -906,7 +953,7 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
 
                     // test Amund - must add new if statements here to activate parent error message:
                     partner.vat!!.take(2) != partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) ||
-                    // TODO: change from elementAT(0) to type = ProjectPartnerAddressTypeData.Organization
+                    // TODO: change from elementAT(0) to type = ProjectPartnerAddressTypeData.Organization (See assiciated contacts section)
                     (!partner.vat.isNullOrEmpty() && partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "AT" && Regex("^(ATU)[0-9]{8}\$").matchEntire(partner.vat!!)==null) ||
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "DE" && Regex("^(DE)[0-9]{9}\$").matchEntire(partner.vat!!)==null) ||
                     (partner.addresses.elementAt(0).nutsRegion2?.substringAfterLast("(")?.take(2) == "HR" && Regex("^(HR)[0-9]{11}\$").matchEntire(partner.vat!!)==null) ||
@@ -1253,7 +1300,7 @@ private fun checkIfPartnerAddressContentIsProvided(partners: Set<ProjectPartnerD
                             )
                         )
                     }
-                    // test Amund - if lead partner from IT or DE but outside programme area, show warning TODO: now
+                    // test Amund - if lead partner from IT or DE but outside programme area, show warning
                     if (partner.role.isLead
                         && address.type == ProjectPartnerAddressTypeData.Organization
                         && address.nutsRegion2?.substringAfterLast("(")?.take(2) == "DE"
@@ -1265,7 +1312,7 @@ private fun checkIfPartnerAddressContentIsProvided(partners: Set<ProjectPartnerD
                             )
                         )
                     }
-                    // test Amund - if lead partner from IT or DE but outside programme area, show warning TODO: now
+                    // test Amund - if lead partner from IT or DE but outside programme area, show warning
                     if (partner.role.isLead
                         && address.type == ProjectPartnerAddressTypeData.Organization
                         && address.nutsRegion2?.substringAfterLast("(")?.take(2) == "IT"
@@ -1458,6 +1505,7 @@ private fun checkIfPartnerAssociatedOrganisationIsProvided(associatedOrganizatio
         isFieldVisible(ApplicationFormFieldId.PARTNER_ASSOCIATED_ORGANIZATIONS) &&
         associatedOrganizations.any { associatedOrganization ->
             associatedOrganization.nameInOriginalLanguage.isNullOrBlank() ||
+                    associatedOrganization.nameInEnglish.isNullOrBlank() ||
                     associatedOrganization.partner.id ?: 0 <= 0 ||
                     associatedOrganization.roleDescription.isNotFullyTranslated(CallDataContainer.get().inputLanguages) ||
                     (associatedOrganization.address != null &&
@@ -1476,13 +1524,13 @@ private fun checkIfPartnerAssociatedOrganisationIsProvided(associatedOrganizatio
                                         contact.lastName.isNullOrBlank() ||
                                         contact.telephone.isNullOrBlank() ||
                                         contact.email.isNullOrBlank())
-                        }  ||
+                        }  /*||
                         associatedOrganization.contacts.any { contact ->
                             contact.type == ProjectContactTypeData.LegalRepresentative &&
                                     (contact.firstName.isNullOrBlank() ||
                                             contact.lastName.isNullOrBlank())
-                        }
-                    )
+                        }*/
+                    ) || (associatedOrganization.contacts.isEmpty() || associatedOrganization.contacts.size < 2 || (associatedOrganization.contacts.size == 1 && associatedOrganization.contacts.elementAt(0).type == ProjectContactTypeData.LegalRepresentative))
         } -> {
             val errorMessages = mutableListOf<PreConditionCheckMessage>()
             associatedOrganizations.forEach { associatedOrganization ->
@@ -1490,6 +1538,17 @@ private fun checkIfPartnerAssociatedOrganisationIsProvided(associatedOrganizatio
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
                             "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.associated.organisation.name.is.not.provided",
+                            mapOf(
+                                "name" to (associatedOrganization.nameInOriginalLanguage
+                                    ?: associatedOrganization.id.toString())
+                            )
+                        )
+                    )
+                }
+                if (associatedOrganization.nameInEnglish.isNullOrBlank()) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.associated.organisation.name.english.is.not.provided",
                             mapOf(
                                 "name" to (associatedOrganization.nameInOriginalLanguage
                                     ?: associatedOrganization.id.toString())
@@ -1585,7 +1644,8 @@ private fun checkIfPartnerAssociatedOrganisationIsProvided(associatedOrganizatio
                         )
                     )
                 }
-                if (associatedOrganization.contacts.isEmpty() || associatedOrganization.contacts.size < 2)
+                // TODO: error messages not build if neither legal representative or contect person filled in (list if contacts empty)
+                if (associatedOrganization.contacts.isEmpty() || associatedOrganization.contacts.size < 2 || associatedOrganization.contacts.size == 1)
                 {
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
@@ -1593,12 +1653,25 @@ private fun checkIfPartnerAssociatedOrganisationIsProvided(associatedOrganizatio
                             mapOf(
                                 "name" to (associatedOrganization.nameInOriginalLanguage
                                     ?: associatedOrganization.id.toString())
+                                , "size" to (associatedOrganization.contacts.size.toString())
                             )
                         )
                     )
                 }
+
                 associatedOrganization.contacts.forEach { contact ->
-                    if (contact.type == ProjectContactTypeData.ContactPerson) {
+                    if (contact.type == ProjectContactTypeData.ContactPerson || associatedOrganization.contacts.isEmpty()) {
+                        if (contact.title.isNullOrBlank()) {
+                            errorMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.associated.organisation.contact.person.title.is.not.provided",
+                                    mapOf(
+                                        "name" to (associatedOrganization.nameInOriginalLanguage
+                                            ?: associatedOrganization.id.toString())
+                                    )
+                                )
+                            )
+                        }
                         if (contact.firstName.isNullOrBlank()) {
                             errorMessages.add(
                                 buildErrorPreConditionCheckMessage(
@@ -1643,7 +1716,8 @@ private fun checkIfPartnerAssociatedOrganisationIsProvided(associatedOrganizatio
                                 )
                             )
                         }
-                    } else {
+                    }
+                    /*else {
                         if (contact.firstName.isNullOrBlank()) {
                             errorMessages.add(
                                 buildErrorPreConditionCheckMessage(
@@ -1666,7 +1740,7 @@ private fun checkIfPartnerAssociatedOrganisationIsProvided(associatedOrganizatio
                                 )
                             )
                         }
-                    }
+                    } */
                 }
                 if (associatedOrganization.roleDescription.isNotFullyTranslated(CallDataContainer.get().inputLanguages)) {
                     errorMessages.add(
@@ -1696,42 +1770,82 @@ private fun checkIfStateAidIsValid(partners: Set<ProjectPartnerData>) =
         partners.forEach { partner ->
             if (partner.stateAid != null && isFieldVisible(ApplicationFormFieldId.PARTNER_STATE_AID_CRITERIA_SELF_CHECK))
             {
-                if (partner.stateAid?.answer1 == null ||
+                if (partner.stateAid?.answer1 == null) // Amund - Removed or-statement
+                {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria1.answer1.not.answered",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // Amund - split check, one for answer and on for justification IF yes
+                if (partner.stateAid?.answer1 == true &&
                     partner.stateAid?.justification1.isNotFullyTranslated(CallDataContainer.get().inputLanguages))
                 {
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
-                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria1.answer1.justification.failed",
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria1.answer1.justification.missing",
                             mapOf("name" to (partner.abbreviation))
                         )
                     )
                 }
-                if (partner.stateAid?.answer2 == null ||
+                if (partner.stateAid?.answer2 == null) // Amund - Removed or-statement
+                {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria1.answer2.not.answered",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // Amund - split check, one for answer and on for justification IF yes
+                if (partner.stateAid?.answer2 == true &&
                     partner.stateAid?.justification2.isNotFullyTranslated(CallDataContainer.get().inputLanguages))
                 {
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
-                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria1.answer2.justification.failed",
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria1.answer2.justification.missing",
                             mapOf("name" to (partner.abbreviation))
                         )
                     )
                 }
-                if (partner.stateAid?.answer3 == null ||
+                if (partner.stateAid?.answer3 == null) // Amund - Removed or-statement
+                {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria2.answer1.not.answered",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // Amund - split check, one for answer and on for justification IF yes
+                if (partner.stateAid?.answer3 == true &&
                     partner.stateAid?.justification3.isNotFullyTranslated(CallDataContainer.get().inputLanguages))
                 {
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
-                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria2.answer1.justification.failed",
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria2.answer1.justification.missing",
                             mapOf("name" to (partner.abbreviation))
                         )
                     )
                 }
-                if (partner.stateAid?.answer4 == null ||
+                if (partner.stateAid?.answer4 == null) // Amund - Removed or-statement
+                {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria2.answer2.not.answered",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
+                // Amund - split check, one for answer and on for justification IF yes
+                if (partner.stateAid?.answer4 == true &&
                     partner.stateAid?.justification4.isNotFullyTranslated(CallDataContainer.get().inputLanguages))
                 {
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
-                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria2.answer2.justification.failed",
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.state.aid.partner.criteria2.answer2.justification.missing",
                             mapOf("name" to (partner.abbreviation))
                         )
                     )

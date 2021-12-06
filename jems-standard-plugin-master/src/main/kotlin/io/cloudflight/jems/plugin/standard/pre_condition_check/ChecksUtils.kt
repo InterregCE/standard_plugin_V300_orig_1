@@ -69,6 +69,11 @@ fun buildWarningPreConditionCheckMessage(
 ): PreConditionCheckMessage =
     buildPreConditionCheckMessage(messageKey, messageArgs, MessageType.WARNING, *checkResults)
 
+fun buildWarningPreConditionCheckMessages(
+    messageKey: String, messageArgs: Map<String, String> = emptyMap(), checkResults: List<PreConditionCheckMessage>?
+): PreConditionCheckMessage =
+    buildPreConditionCheckMessage(messageKey, messageArgs, MessageType.WARNING, checkResults)
+
 fun Set<InputTranslationData>?.isNotFullyTranslated(mandatoryLanguages: Set<SystemLanguageData>): Boolean {
     return !this.isFullyTranslated(mandatoryLanguages)
 }
