@@ -12,6 +12,7 @@ import java.math.BigDecimal
 
 private const val SECTION_E_MESSAGES_PREFIX = "$MESSAGES_PREFIX.section.e"
 private const val SECTION_E_ERROR_MESSAGES_PREFIX = "$SECTION_E_MESSAGES_PREFIX.error"
+private const val SECTION_E_WARNING_MESSAGES_PREFIX = "$SECTION_E_MESSAGES_PREFIX.warning"
 private const val SECTION_E_INFO_MESSAGES_PREFIX = "$SECTION_E_MESSAGES_PREFIX.info"
 
 fun checkSectionE(sectionEData: ProjectDataSectionE): PreConditionCheckMessage {
@@ -20,14 +21,28 @@ fun checkSectionE(sectionEData: ProjectDataSectionE): PreConditionCheckMessage {
 
         checkIfPartnersShareSumUpToTotalLumpSum(sectionEData.projectLumpSums),
 
-        checkIfLumpSumPeriodsProvided(sectionEData.projectLumpSums)
+        checkIfLumpSumPeriodsProvided(sectionEData.projectLumpSums),
+
+        checkIfLumpSumAdded(sectionEData.projectLumpSums)
     )
 }
+// Add warning if no Lump Sum is added
+private fun checkIfLumpSumAdded(lumpSums: List<ProjectLumpSumData>) =
+    when {
+        lumpSums.isEmpty() ->
+            buildWarningPreConditionCheckMessage("$SECTION_E_WARNING_MESSAGES_PREFIX.lump.sum.missing")
+        else -> null
+    }
+// todo: check that lump sum is added to perp cost
+// todo: make header warning triangle if only warning present (ChecksUtils => buildPreConditionCheckMessage => subSectionMessages.firstOrNull)
 
 private fun checkIfPartnersShareSumUpToTotalLumpSum(lumpSums: List<ProjectLumpSumData>) =
     when {
         lumpSums.any { lumpSum -> lumpSum.programmeLumpSum?.cost ?: BigDecimal.ZERO != lumpSum.lumpSumContributions.sumOf { it.amount } } ->
-            buildErrorPreConditionCheckMessage("$SECTION_E_ERROR_MESSAGES_PREFIX.partner.amount.do.not.sum.up.to.budget.entry.sum")
+            buildErrorPreConditionCheckMessage("$SECTION_E_ERROR_MESSAGES_PREFIX.partner.amount.do.not.sum.up.to.budget.entry.sum",
+                mapOf("name" to (lumpSums.toString()))
+
+            )
         else -> null
     }
 

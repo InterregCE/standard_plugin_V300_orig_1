@@ -1,6 +1,7 @@
 package io.cloudflight.jems.plugin.standard.pre_condition_check
 
 import io.cloudflight.jems.plugin.contract.models.common.InputTranslationData
+import io.cloudflight.jems.plugin.contract.models.programme.strategy.ProgrammeStrategyData
 import io.cloudflight.jems.plugin.contract.models.project.ApplicationFormFieldId
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.ProjectDataSectionC
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.longTermPlans.ProjectLongTermPlansData
@@ -77,7 +78,7 @@ fun checkSectionC(sectionCData: ProjectDataSectionC?): PreConditionCheckMessage 
 
             checkIfAtLeastOneWorkPackageIsAdded(sectionCData?.projectWorkPackages),
 
-            checkIfNamesOfWorkPackagesAreProvided(sectionCData?.projectWorkPackages),
+            //checkIfNamesOfWorkPackagesAreProvided(sectionCData?.projectWorkPackages),
 
             checkIfMoreThan5WorkPackagesAreAdded(sectionCData?.projectWorkPackages),
 
@@ -182,7 +183,7 @@ private fun checkIfSpecificationIsProvidedForAllTargetGroups(projectBenefits: Li
     }
 
 
-// Amund - Warning for several of the same target groups TODO: make into warning
+// Amund - Warning for several of the same target groups
 private fun checkIfTargetGroupAddedSeveralTimes(projectBenefits: List<ProjectRelevanceBenefitData>?) =
     when {
         projectBenefits != null  -> {
@@ -204,13 +205,14 @@ private fun checkIfTargetGroupAddedSeveralTimes(projectBenefits: List<ProjectRel
         else -> null
     }
 
-// Amund - Warning for several of the same target groups TODO: make into warning
+// Amund - Warning for several of the same strategies except 'others'
 private fun checkIfStrategyAddedSeveralTimes(projectStrategies: List<ProjectRelevanceStrategyData>?) =
     when {
         projectStrategies != null  -> {
             val strategies = mutableListOf<String>()
             projectStrategies.forEach { projectStrategy ->
-                strategies.add(projectStrategy.strategy.toString())
+                if (projectStrategy.strategy == ProgrammeStrategyData.Other)
+                    strategies.add(projectStrategy.strategy.toString())
             }
             val dupes = strategies.groupingBy { it }.eachCount().filter { it.value > 1 }
             if (dupes.isNotEmpty()) {
@@ -220,9 +222,15 @@ private fun checkIfStrategyAddedSeveralTimes(projectStrategies: List<ProjectRele
             else {
                 null
             }
-
         }
+        else -> null
+    }
 
+// Amund - Warning for several no synergies added
+private fun checkForSynergies(projectSynergies: List<ProjectRelevanceSynergyData>?) =
+    when {
+        !isFieldVisible(ApplicationFormFieldId.PROJECT_SYNERGIES) -> null
+        projectSynergies.isNullOrEmpty() -> buildWarningPreConditionCheckMessage("$SECTION_C_WARNING_MESSAGES_PREFIX.no.synergies.added")
         else -> null
     }
 
@@ -267,7 +275,8 @@ private fun checkIfWorkPackageContentIsProvided(workPackages: List<ProjectWorkPa
                 workPackages.any { workPackage ->
                     isActivitiesContentMissing(workPackage.activities) ||
                     isOutputsContentMissing(workPackage.outputs) ||
-                    isInvestmentsContentMissing(workPackage.investments)
+                    isInvestmentsContentMissing(workPackage.investments) ||
+                            workPackage.activities.isEmpty()
                 } -> {
             val errorMessages = mutableListOf<PreConditionCheckMessage>()
             workPackages.forEach { workPackage ->
@@ -299,7 +308,7 @@ private fun checkIfWorkPackageContentIsProvided(workPackages: List<ProjectWorkPa
                         )
                     )
                 }
-                val errorOutputMessages = checkIfOutputsAreValid(workPackage.workPackageNumber, workPackage.outputs)
+                val errorOutputMessages = checkIfOutputsAreValid(workPackage.workPackageNumber, workPackage.outputs, workPackage.activities) // Amund act
                 if (errorOutputMessages.isNotEmpty()) {
                     errorMessages.add(
                         buildErrorPreConditionCheckMessages(
@@ -331,15 +340,15 @@ private fun checkIfAtLeastOneWorkPackageIsAdded(workPackages: List<ProjectWorkPa
         workPackages.isNullOrEmpty() -> buildErrorPreConditionCheckMessage("$SECTION_C_ERROR_MESSAGES_PREFIX.at.least.one.work.package.should.be.added")
         else -> null
     }
-
-private fun checkIfNamesOfWorkPackagesAreProvided(workPackages: List<ProjectWorkPackageData>?) =
+// Amund - removed and added to checkIfObjectivesOfWorkPackagesAreProvided function with more details
+/*private fun checkIfNamesOfWorkPackagesAreProvided(workPackages: List<ProjectWorkPackageData>?) =
     when {
         !isFieldVisible(ApplicationFormFieldId.PROJECT_WORK_PACKAGE_TITLE) -> null
         workPackages.isNullOrEmpty() -> null
         workPackages.any { it.name.isNotFullyTranslated(CallDataContainer.get().inputLanguages) }
             -> buildErrorPreConditionCheckMessage("$SECTION_C_ERROR_MESSAGES_PREFIX.names.of.work.packages.should.be.added")
         else -> null
-    }
+    }*/
 // Amund CE check: max 5 WPs in total
 private fun checkIfMoreThan5WorkPackagesAreAdded(workPackages: List<ProjectWorkPackageData>?) =
     when {
@@ -351,9 +360,20 @@ private fun checkIfObjectivesOfWorkPackagesAreProvided(workPackages: List<Projec
     when {
         workPackages.isNullOrEmpty() -> null
         workPackages.any { it.objectiveAndAudience.isNotFullyTranslated(CallDataContainer.get().inputLanguages) ||
-                it.specificObjective.isNotFullyTranslated(CallDataContainer.get().inputLanguages) } -> {
+                it.specificObjective.isNotFullyTranslated(CallDataContainer.get().inputLanguages) ||
+                it.name.isNotFullyTranslated(CallDataContainer.get().inputLanguages)} -> {
             val errorMessages = mutableListOf<PreConditionCheckMessage>()
             workPackages.forEach { workPackage ->
+                // Amund Check for WP titles
+                if (isFieldVisible(ApplicationFormFieldId.PROJECT_WORK_PACKAGE_TITLE) &&
+                    workPackage.name.isNotFullyTranslated(CallDataContainer.get().inputLanguages)) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_C_ERROR_MESSAGES_PREFIX.project.work.package.title.missing",
+                            mapOf("id" to ("WP" + workPackage.workPackageNumber.toString()))
+                        )
+                    )
+                }
                 if (isFieldVisible(ApplicationFormFieldId.PROJECT_SPECIFIC_OBJECTIVE) &&
                     workPackage.specificObjective.isNotFullyTranslated(CallDataContainer.get().inputLanguages)) {
                     errorMessages.add(
@@ -488,6 +508,8 @@ private fun checkIfDescriptionForAllSelectedCooperationCriteriaIsProvided(projec
         projectManagement?.projectCooperationCriteria == null -> null
         isJointDevelopmentSelectedAndHasMissingTranslation(projectManagement) ||
                 isJointImplementationSelectedAndHasMissingTranslation(projectManagement) ||
+                // Amund - Added missing coop criteria
+                isJointFinancingSelectedAndHasMissingTranslation(projectManagement) ||
                 isJointStaffingSelectedAndHasMissingTranslation(projectManagement) ->
             buildErrorPreConditionCheckMessage("$SECTION_C_ERROR_MESSAGES_PREFIX.description.for.selected.cooperation.criteria.is.not.provided")
         else -> null
@@ -611,16 +633,52 @@ private fun checkIfActivitiesAreValid(workPackageNumber: Int, activities: List<W
                     )
                 )
             }
-            if (isFieldVisible(ApplicationFormFieldId.PROJECT_ACTIVITIES_DELIVERABLES) &&
-                activity.deliverables.any {deliverable -> deliverable.period == null ||
-                        deliverable.description.isNotFullyTranslated(CallDataContainer.get().inputLanguages) }) {
+            // Amund - Split into 2 checks, one for description and one for period
+            if (isFieldVisible(ApplicationFormFieldId.PROJECT_ACTIVITIES_DELIVERABLES)) {
+                if (activity.deliverables.isNotEmpty()) {
+                    activity.deliverables.forEach { deliverable ->
+                        if (deliverable.description.isNotFullyTranslated(CallDataContainer.get().inputLanguages)) {
+                            errorActivitiesMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_C_ERROR_MESSAGES_PREFIX.project.work.package.activity.deliverable.delivery.description.is.not.provided",
+                                    mapOf("id" to (workPackageNumber.toString() + "." + activity.activityNumber.toString() + "." + deliverable.deliverableNumber.toString())
+                                    , "period" to (deliverable.period.toString()))
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+            // Amund - period check
+            if (isFieldVisible(ApplicationFormFieldId.PROJECT_ACTIVITIES_DELIVERABLES)) {
+                if (activity.deliverables.isNotEmpty()) {
+                    activity.deliverables.forEach { deliverable ->
+                        if (deliverable.period == null) {
+                            errorActivitiesMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_C_ERROR_MESSAGES_PREFIX.project.work.package.activity.deliverable.delivery.period.is.not.provided",
+                                    mapOf("id" to (workPackageNumber.toString() + "." + activity.activityNumber.toString() + "." + deliverable.deliverableNumber.toString()))
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+            // Amund - check that delivery period is insode of activity perriod
+            if (isFieldVisible(ApplicationFormFieldId.PROJECT_ACTIVITIES_DELIVERABLES) && activity.deliverables.isNotEmpty()) {
                 activity.deliverables.forEach { deliverable ->
-                    errorActivitiesMessages.add(
-                        buildErrorPreConditionCheckMessage(
-                            "$SECTION_C_ERROR_MESSAGES_PREFIX.project.work.package.activity.deliverable.delivery.period.or.description.is.not.provided",
-                            mapOf("id" to (workPackageNumber.toString() + "." + activity.activityNumber.toString() + "." + deliverable.deliverableNumber.toString()))
-                        )
-                    )
+                    if (deliverable.period != null && activity.endPeriod != null && activity.startPeriod != null ) {
+                        if (deliverable.period!! > activity.endPeriod!! || deliverable.period!! < activity.startPeriod!!) {
+                            errorActivitiesMessages.add(
+                                buildErrorPreConditionCheckMessage(
+                                    "$SECTION_C_ERROR_MESSAGES_PREFIX.project.work.package.activity.deliverable.delivery.period.not.inside.activity.period",
+                                    mapOf("id" to (workPackageNumber.toString() + "." + activity.activityNumber.toString() + "." + deliverable.deliverableNumber.toString()),
+                                        "act_id" to (workPackageNumber.toString() + "." + activity.activityNumber.toString())
+                                        )
+                                )
+                            )
+                        }
+                    }
                 }
             }
             if (isFieldVisible(ApplicationFormFieldId.PROJECT_ACTIVITIES_STATE_AID_PARTNERS_INVOLVED) &&
@@ -632,17 +690,22 @@ private fun checkIfActivitiesAreValid(workPackageNumber: Int, activities: List<W
                     )
                 )
             }
+
         }
-    } else {
+    }
+    // Amund - should not be needed?? - already checked above in checkIfWorkPackageContentIsProvided()
+    else {
         errorActivitiesMessages.add(
             buildErrorPreConditionCheckMessage(
-                "$SECTION_C_ERROR_MESSAGES_PREFIX.at.least.one.work.package.activity.should.be.added")
+                "$SECTION_C_ERROR_MESSAGES_PREFIX.at.least.one.work.package.activity.should.be.added",
+                mapOf("id" to ("WP" + workPackageNumber.toString()))
+            )
         )
     }
     return errorActivitiesMessages
 }
 
-private fun checkIfOutputsAreValid(workPackageNumber: Int, outputs: List<WorkPackageOutputData>): List<PreConditionCheckMessage> {
+private fun checkIfOutputsAreValid(workPackageNumber: Int, outputs: List<WorkPackageOutputData>, activities: List<WorkPackageActivityData>): List<PreConditionCheckMessage> {
     val errorOutputsMessages = mutableListOf<PreConditionCheckMessage>()
     if (outputs.isNotEmpty()) {
         outputs.forEach { output ->
@@ -687,6 +750,29 @@ private fun checkIfOutputsAreValid(workPackageNumber: Int, outputs: List<WorkPac
                         mapOf("id" to (workPackageNumber.toString() + "." + output.outputNumber.toString()))
                     )
                 )
+            }
+            // Amund Check if output delivery period is outside WP duration
+
+            if (activities.isNotEmpty() && output.periodNumber != null) {
+                val activitiesStart = mutableListOf<Int>()
+                val activitiesEnd = mutableListOf<Int>()
+                activities.forEach { activity ->
+                    activitiesStart.add(activity.startPeriod!!)
+                    activitiesEnd.add(activity.endPeriod!!)
+                }
+                if (output.periodNumber!! < activitiesStart.minOrNull()!! || output.periodNumber!! > activitiesEnd.maxOrNull()!!) {
+                    errorOutputsMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_C_ERROR_MESSAGES_PREFIX.project.work.package.output.delivery.period.outside.of.wp.duration",
+                            mapOf(
+                                "id" to (workPackageNumber.toString() + "." + output.outputNumber.toString()),
+                                "wp_id" to (workPackageNumber.toString()),
+                                "start" to (activitiesStart.minOrNull()!!.toString()),
+                                "end" to (activitiesEnd.maxOrNull()!!.toString())
+                            )
+                        )
+                    )
+                }
             }
         }
     } else {
@@ -821,6 +907,11 @@ private fun isJointImplementationSelectedAndHasMissingTranslation(projectManagem
 private fun isJointStaffingSelectedAndHasMissingTranslation(projectManagement: ProjectManagementData) =
     projectManagement.projectCooperationCriteria?.projectJointStaffing == true
             && projectManagement.projectJointStaffingDescription.isNotFullyTranslated(CallDataContainer.get().inputLanguages)
+
+// Amund added missing Coop criteria
+private fun isJointFinancingSelectedAndHasMissingTranslation(projectManagement: ProjectManagementData) =
+    projectManagement.projectCooperationCriteria?.projectJointFinancing == true
+            && projectManagement.projectJointFinancingDescription.isNotFullyTranslated(CallDataContainer.get().inputLanguages)
 
 private fun isActivitiesContentMissing(activities: List<WorkPackageActivityData>) =
     activities.isEmpty() ||
