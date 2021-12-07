@@ -53,7 +53,9 @@ fun checkSectionC(sectionCData: ProjectDataSectionC?): PreConditionCheckMessage 
 
             checkIfSpecificationIsProvidedForAllTargetGroups(sectionCData?.projectRelevance?.projectBenefits),
 
-            checkIfTargetGroupAddedSeveralTime(sectionCData?.projectRelevance?.projectBenefits),
+            checkIfTargetGroupAddedSeveralTimes(sectionCData?.projectRelevance?.projectBenefits),
+
+            checkIfStrategyAddedSeveralTimes(sectionCData?.projectRelevance?.projectStrategies),
 
             checkIfAtLeastOneStrategyIsAdded(sectionCData?.projectRelevance?.projectStrategies),
 
@@ -181,7 +183,7 @@ private fun checkIfSpecificationIsProvidedForAllTargetGroups(projectBenefits: Li
 
 
 // Amund - Warning for several of the same target groups TODO: make into warning
-private fun checkIfTargetGroupAddedSeveralTime(projectBenefits: List<ProjectRelevanceBenefitData>?) =
+private fun checkIfTargetGroupAddedSeveralTimes(projectBenefits: List<ProjectRelevanceBenefitData>?) =
     when {
         projectBenefits != null  -> {
             val groups = mutableListOf<String>()
@@ -191,7 +193,29 @@ private fun checkIfTargetGroupAddedSeveralTime(projectBenefits: List<ProjectRele
             val dupes = groups.groupingBy { it }.eachCount().filter { it.value > 1 }
             if (dupes.isNotEmpty()) {
                 buildWarningPreConditionCheckMessage("$SECTION_C_WARNING_MESSAGES_PREFIX.target.group.used.several.times"
-                    , mapOf("groups" to (groups.toString()), "dupes" to (dupes.toString()) ))
+                    , mapOf("groups" to (groups.toString()), "dupes" to (dupes.keys.toString()) ))
+            }
+            else {
+                null
+            }
+
+        }
+
+        else -> null
+    }
+
+// Amund - Warning for several of the same target groups TODO: make into warning
+private fun checkIfStrategyAddedSeveralTimes(projectStrategies: List<ProjectRelevanceStrategyData>?) =
+    when {
+        projectStrategies != null  -> {
+            val strategies = mutableListOf<String>()
+            projectStrategies.forEach { projectStrategy ->
+                strategies.add(projectStrategy.strategy.toString())
+            }
+            val dupes = strategies.groupingBy { it }.eachCount().filter { it.value > 1 }
+            if (dupes.isNotEmpty()) {
+                buildWarningPreConditionCheckMessage("$SECTION_C_WARNING_MESSAGES_PREFIX.strategy.used.several.times"
+                    , mapOf("strategies" to (strategies.toString()), "dupes" to (dupes.keys.toString()) ))
             }
             else {
                 null
