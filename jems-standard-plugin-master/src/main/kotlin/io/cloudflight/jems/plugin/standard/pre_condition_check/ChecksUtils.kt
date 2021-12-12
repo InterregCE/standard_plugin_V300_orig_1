@@ -21,7 +21,7 @@ fun buildPreConditionCheckMessage(
     ).let { subSectionMessages ->
         PreConditionCheckMessage(
             I18nMessageData(messageKey, messageArgs),
-            subSectionMessages.firstOrNull { it.messageType == MessageType.ERROR }?.messageType ?: MessageType.INFO,
+            subSectionMessages.firstOrNull { it.messageType == MessageType.ERROR }?.messageType ?: subSectionMessages.firstOrNull { it.messageType == MessageType.WARNING }?.messageType ?: MessageType.INFO,
             subSectionMessages
         )
     }

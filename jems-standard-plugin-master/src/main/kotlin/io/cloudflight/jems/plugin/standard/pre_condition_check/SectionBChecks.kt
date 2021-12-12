@@ -30,7 +30,7 @@ fun checkSectionB(sectionBData: ProjectDataSectionB): PreConditionCheckMessage {
         // Amund updated wording
         //checkIfAtLeastThreePartnersAreAdded(sectionBData.partners),
 
-        checkParnterComposition(sectionBData.partners),
+        checkPartnerComposition(sectionBData.partners),
 
         checkIfExactlyOneLeadPartnerIsAdded(sectionBData.partners),
 
@@ -107,7 +107,7 @@ private fun checkIfTotalBudgetIsGreaterThanZero(partners: Set<ProjectPartnerData
 //  - From at least 3 countries
 //  - At least 2 partners from CE regions
 //  - If partner type = EGTC => at least 1 partner EGTC must be in CE region
-private fun checkParnterComposition(partners: Set<ProjectPartnerData>) =
+private fun checkPartnerComposition(partners: Set<ProjectPartnerData>) =
    when {
        partners.isNotEmpty() ->
        {
@@ -116,7 +116,7 @@ private fun checkParnterComposition(partners: Set<ProjectPartnerData>) =
            val CECountries = mutableListOf<String>()
            var isEGTC = false
            partners.forEach { partner ->
-               if (partner.partnerType == ProjectTargetGroupData.Egtc && partner.role.isLead) {
+               if (partner.partnerType == ProjectTargetGroupData.Egtc) {
                     isEGTC = true
                }
                partner.addresses.forEach { address ->
@@ -146,7 +146,7 @@ private fun checkParnterComposition(partners: Set<ProjectPartnerData>) =
            }
            if (isEGTC) {
                partners.forEach { partner ->
-                   if (partner.role.isLead) {
+                   if (partner.partnerType == ProjectTargetGroupData.Egtc) {
                        partner.addresses.forEach { address ->
                            if (address.type == ProjectPartnerAddressTypeData.Organization && address.country !in listOf("Magyarország (HU)","Italia (IT)","Slovenija (SI)","Slovensko (SK)","Česko (CZ)","Polska (PL)","Hrvatska (HR)","Deutschland (DE)","Österreich (AT)")) {
                                errorMessages.add(
@@ -966,7 +966,8 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                     (!partner.otherIdentifierNumber.isNullOrEmpty() && partner.otherIdentifierDescription.isNullOrEmpty()) ||
                     (partner.otherIdentifierNumber.isNullOrEmpty() && !partner.otherIdentifierDescription.isNullOrEmpty()) ||
                     (partner.partnerType == ProjectTargetGroupData.GeneralPublic) ||
-                    (partner.partnerType == ProjectTargetGroupData.Sme && partner.partnerSubType == null)
+                    ((partner.partnerType == ProjectTargetGroupData.Sme || partner.partnerType == ProjectTargetGroupData.EnterpriseExceptSme) && partner.partnerSubType == null) ||
+                    (partner.partnerType == null)
 
         } -> {
             val errorMessages = mutableListOf<PreConditionCheckMessage>()
@@ -1032,6 +1033,16 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                         )
                     )
                 }
+                // Amund - Partner type must be selected
+                if (isFieldVisible(ApplicationFormFieldId.PARTNER_VAT_IDENTIFIER)
+                    && partner.partnerType == null) {
+                    errorMessages.add(
+                        buildErrorPreConditionCheckMessage(
+                            "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.type.not.added",
+                            mapOf("name" to (partner.abbreviation))
+                        )
+                    )
+                }
                 // Amund - The selected type of partner cannot be "General Public"
                 if (isFieldVisible(ApplicationFormFieldId.PARTNER_VAT_IDENTIFIER)
                     && partner.partnerType == ProjectTargetGroupData.GeneralPublic ) {
@@ -1044,7 +1055,7 @@ private fun checkIfPartnerIdentityContentIsProvided(partners: Set<ProjectPartner
                 }
                 // Amund - If he selected type of partner is SME subtype is also mandatory
                 if (isFieldVisible(ApplicationFormFieldId.PARTNER_VAT_IDENTIFIER)
-                    && partner.partnerType == ProjectTargetGroupData.Sme
+                    && (partner.partnerType == ProjectTargetGroupData.Sme || partner.partnerType == ProjectTargetGroupData.EnterpriseExceptSme)
                     && partner.partnerSubType == null) {
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
@@ -1454,7 +1465,9 @@ private fun checkIfPartnerMotivationContentIsProvided(partners: Set<ProjectPartn
     when {
         partners.any { partner ->
             partner.motivation?.organizationRelevance.isNotFullyTranslated(CallDataContainer.get().inputLanguages) ||
-                    partner.motivation?.organizationRole.isNotFullyTranslated(CallDataContainer.get().inputLanguages)
+                    partner.motivation?.organizationRole.isNotFullyTranslated(CallDataContainer.get().inputLanguages) ||
+                    (partner.motivation?.organizationExperience.isNotFullyTranslated(CallDataContainer.get().inputLanguages)
+                    && partner.role.isLead)
         } -> {
             val errorMessages = mutableListOf<PreConditionCheckMessage>()
             partners.forEach { partner ->
