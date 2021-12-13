@@ -14,7 +14,6 @@ import io.cloudflight.jems.plugin.contract.models.project.sectionC.partnership.P
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.relevance.ProjectRelevanceBenefitData
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.relevance.ProjectRelevanceStrategyData
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.relevance.ProjectRelevanceSynergyData
-import io.cloudflight.jems.plugin.contract.models.project.sectionC.relevance.ProjectTargetGroupData
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.results.ProjectResultData
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.workpackage.ProjectWorkPackageData
 import io.cloudflight.jems.plugin.contract.models.project.sectionC.workpackage.WorkPackageActivityData
@@ -81,6 +80,8 @@ fun checkSectionC(sectionCData: ProjectDataSectionC?): PreConditionCheckMessage 
             //checkIfNamesOfWorkPackagesAreProvided(sectionCData?.projectWorkPackages),
 
             checkIfMoreThan5WorkPackagesAreAdded(sectionCData?.projectWorkPackages),
+
+            checkIfOutputIndicatorRCO87Added(sectionCData?.projectWorkPackages),
 
             checkIfObjectivesOfWorkPackagesAreProvided(sectionCData?.projectWorkPackages),
 
@@ -356,6 +357,30 @@ private fun checkIfMoreThan5WorkPackagesAreAdded(workPackages: List<ProjectWorkP
         else -> null
     }
 
+private fun checkIfOutputIndicatorRCO87Added(workPackages: List<ProjectWorkPackageData>?) =
+    when { workPackages.isNullOrEmpty() -> null
+            workPackages.isNotEmpty() -> {
+                var outputIndicatorRCO87 = false
+                val WPOutputIndicatorRCO87 = mutableListOf<String>()
+                workPackages.forEach { workPackage ->
+                    workPackage.outputs.forEach { output ->
+                        if (output.programmeOutputIndicatorIdentifier.toString() in listOf("OI253","OI413","OI313","OI243","OI233","OI223","OI213","OI123","OI113")) {
+                            outputIndicatorRCO87 = true
+                            WPOutputIndicatorRCO87.add(output.outputNumber.toString())
+
+                        }
+                    }
+                }
+                if (outputIndicatorRCO87 == false) {
+                    buildErrorPreConditionCheckMessage("$SECTION_C_ERROR_MESSAGES_PREFIX.project.work.plan.missing.output.indicator.RCO87")
+                }
+                else if (WPOutputIndicatorRCO87.size > 1) {
+                    buildErrorPreConditionCheckMessage("$SECTION_C_ERROR_MESSAGES_PREFIX.project.work.plan.several.output.indicator.RCO87",
+                    mapOf("RCO87" to (outputIndicatorRCO87.toString())))
+                } else null
+            }
+        else -> null
+    }
 private fun checkIfObjectivesOfWorkPackagesAreProvided(workPackages: List<ProjectWorkPackageData>?) =
     when {
         workPackages.isNullOrEmpty() -> null
@@ -466,7 +491,8 @@ private fun checkIfResultContentIsProvided(projectData: ProjectDataSectionC?) =
                     errorMessages.add(
                         buildErrorPreConditionCheckMessage(
                             "$SECTION_C_ERROR_MESSAGES_PREFIX.project.result.description.is.not.provided",
-                            mapOf("name" to (result.resultNumber.toString()))
+                            mapOf("name" to (result.resultNumber.toString())
+                                )
                         )
                     )
                 }
@@ -714,7 +740,10 @@ private fun checkIfOutputsAreValid(workPackageNumber: Int, outputs: List<WorkPac
                 errorOutputsMessages.add(
                     buildErrorPreConditionCheckMessage(
                         "$SECTION_C_ERROR_MESSAGES_PREFIX.project.work.package.output.title.is.not.provided",
-                        mapOf("id" to (workPackageNumber.toString() + "." + output.outputNumber.toString()))
+                        mapOf("id" to (workPackageNumber.toString() + "." + output.outputNumber.toString()),
+                            "OIid" to (output.programmeOutputIndicatorId.toString()),
+                            "OIidentifier" to (output.programmeOutputIndicatorIdentifier.toString())
+                        )
                     )
                 )
             }

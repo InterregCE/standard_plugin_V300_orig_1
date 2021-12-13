@@ -21,6 +21,7 @@ fun buildPreConditionCheckMessage(
     ).let { subSectionMessages ->
         PreConditionCheckMessage(
             I18nMessageData(messageKey, messageArgs),
+            // Amund - Added one extra firstOrNull to check for warning messages
             subSectionMessages.firstOrNull { it.messageType == MessageType.ERROR }?.messageType ?: subSectionMessages.firstOrNull { it.messageType == MessageType.WARNING }?.messageType ?: MessageType.INFO,
             subSectionMessages
         )

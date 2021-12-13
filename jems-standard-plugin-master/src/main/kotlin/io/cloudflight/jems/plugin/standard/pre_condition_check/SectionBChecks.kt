@@ -1197,10 +1197,20 @@ private fun checkIfPartnerAddressContentIsProvided(partners: Set<ProjectPartnerD
                     ) ||    // Amund - add CE check to build address error message
                             (partner.role.isLead && address.type == ProjectPartnerAddressTypeData.Organization && address.nutsRegion2?.substringAfterLast("(")?.take(2)!! !in listOf("AT", "IT", "HR", "CZ", "HU", "PL", "SI", "SK", "DE")) ||
                             (address.type == ProjectPartnerAddressTypeData.Organization && address.country !in listOf("Österreich (AT)", "Belgique/België (BE)", "Bulgaria (BG)", "Hrvatska (HR)", "Kýpros (CY)", "Česko (CZ)", "Danmark (DK)", "Eesti (EE)", "Suomi/Finland (FI)", "France (FR)", "Deutschland (DE)", "Elláda (EL)", "Magyarország (HU)", "Éire/Ireland (IE)", "Italia (IT)", "Latvija (LV)", "Lietuva (LT)", "Luxembourg (LU)", "Malta (MT)", "Nederland (NL)", "Polska (PL)", "Portugal (PT)", "România (RO)", "Slovensko (SK)", "Slovenija (SI)", "España (ES)", "Sverige (SE)")) ||
-                            (address.type == ProjectPartnerAddressTypeData.Organization && address.homepage.isNullOrBlank())
+                            (address.type == ProjectPartnerAddressTypeData.Organization && address.homepage.isNullOrBlank()) ||
+                            (partner.role.isLead
+                                    && address.type == ProjectPartnerAddressTypeData.Organization
+                                    && address.nutsRegion2?.substringAfterLast("(")?.take(2) == "DE"
+                                    && address.nutsRegion2?.substringAfterLast("(")?.substringBefore(')') !in listOf("DE11","DE12","DE13","DE14","DE21","DE22","DE23","DE24","DE25","DE26","DE27","DE30","DE40","DE80","DE91")) ||
+                            (partner.role.isLead
+                                    && address.type == ProjectPartnerAddressTypeData.Organization
+                                    && address.nutsRegion2?.substringAfterLast("(")?.take(2) == "IT"
+                                    && address.nutsRegion2?.substringAfterLast("(")?.substringBefore(')') !in listOf("ITC1","ITC2","ITC3","ITC4","ITH1","ITH2","ITH3","ITH4","ITH5"))
                 })
         } -> {
             val errorMessages = mutableListOf<PreConditionCheckMessage>()
+            // amund added boolean for waring message
+            var warning = false
             partners.forEach { partner ->
                 if (partner.addresses.isEmpty())
                 {
@@ -1315,7 +1325,8 @@ private fun checkIfPartnerAddressContentIsProvided(partners: Set<ProjectPartnerD
                     if (partner.role.isLead
                         && address.type == ProjectPartnerAddressTypeData.Organization
                         && address.nutsRegion2?.substringAfterLast("(")?.take(2) == "DE"
-                        && address.nutsRegion2?.substringAfterLast("(")?.substringBefore(')') !in listOf("DE11","DE12","DE13","DE14","DE21","DE22","DE23","DE24","DE25","DE26","DE27","DE30","DE40","DE80","DE91")) {
+                        && address.nutsRegion2?.substringAfterLast("(")?.substringBefore(')') !in listOf("DE11","DE12","DE13","DE14","DE21","DE22","DE23","DE24","DE25","DE26","DE27","DE30","DE40","DE80","DE91","DED2","DED4","DED5","DEE0","DEG0")) {
+                        warning = true
                         errorMessages.add(
                             buildWarningPreConditionCheckMessage(
                                 "$SECTION_B_WARNING_MESSAGES_PREFIX.project.partner.DE.lp.not.in.programme.area",
@@ -1328,6 +1339,7 @@ private fun checkIfPartnerAddressContentIsProvided(partners: Set<ProjectPartnerD
                         && address.type == ProjectPartnerAddressTypeData.Organization
                         && address.nutsRegion2?.substringAfterLast("(")?.take(2) == "IT"
                         && address.nutsRegion2?.substringAfterLast("(")?.substringBefore(')') !in listOf("ITC1","ITC2","ITC3","ITC4","ITH1","ITH2","ITH3","ITH4","ITH5")) {
+                        warning = true
                         errorMessages.add(
                             buildWarningPreConditionCheckMessage(
                                 "$SECTION_B_WARNING_MESSAGES_PREFIX.project.partner.IT.lp.not.in.programme.area",
@@ -1337,7 +1349,14 @@ private fun checkIfPartnerAddressContentIsProvided(partners: Set<ProjectPartnerD
                     }
                 }
             }
-            if (errorMessages.count() > 0) {
+            if (errorMessages.count() == 1 && warning) {
+                buildWarningPreConditionCheckMessages(
+                    "$SECTION_B_WARNING_MESSAGES_PREFIX.project.partner.main.address.warning",
+                    messageArgs = emptyMap(),
+                    errorMessages
+                )
+            }
+            else if (errorMessages.count() > 0) {
                 buildErrorPreConditionCheckMessages(
                     "$SECTION_B_ERROR_MESSAGES_PREFIX.project.partner.main.address",
                     messageArgs = emptyMap(),
