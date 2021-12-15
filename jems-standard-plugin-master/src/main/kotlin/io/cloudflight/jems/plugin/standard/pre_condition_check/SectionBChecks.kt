@@ -183,7 +183,9 @@ private fun checkIfCoFinancingContentIsProvided(partners: Set<ProjectPartnerData
                     partner.budget.projectPartnerCoFinancing.partnerContributions.any { partnerContribution -> partnerContribution.amount ?: BigDecimal.ZERO <= BigDecimal.ZERO } ||
                     partner.budget.projectPartnerCoFinancing.partnerContributions.any { partnerContribution -> partnerContribution.status == null } ||
                     partner.budget.projectPartnerCoFinancing.finances.isNullOrEmpty() ||
-                    partner.budget.projectPartnerCoFinancing.finances.any { finance -> finance.percentage <= BigDecimal.ZERO }
+                    partner.budget.projectPartnerCoFinancing.finances.any { finance -> finance.percentage <= BigDecimal.ZERO } ||
+                            // Amund add check for co-financing percentage
+                            partner.budget.projectPartnerCoFinancing.finances.any { finance -> (finance.fundType == ProjectPartnerCoFinancingFundTypeData.MainFund && finance.percentage.intValueExact() != 80) }
                 } ->
         {
             val errorMessages = mutableListOf<PreConditionCheckMessage>()
@@ -203,6 +205,25 @@ private fun checkIfCoFinancingContentIsProvided(partners: Set<ProjectPartnerData
                             mapOf("name" to (partner.abbreviation))
                         )
                     )
+                }
+                // test Amund - check erdf 80% ADDED: remove for partners outside EU (have no ERDF)
+                partner.addresses.forEach { address ->
+                    if (address.type == ProjectPartnerAddressTypeData.Organization
+                        && address.country in listOf("Österreich (AT)", "Belgique/België (BE)", "Bulgaria (BG)", "Hrvatska (HR)", "Kýpros (CY)", "Česko (CZ)", "Danmark (DK)", "Eesti (EE)", "Suomi/Finland (FI)", "France (FR)", "Deutschland (DE)", "Elláda (EL)", "Magyarország (HU)", "Éire/Ireland (IE)", "Italia (IT)", "Latvija (LV)", "Lietuva (LT)", "Luxembourg (LU)", "Malta (MT)", "Nederland (NL)", "Polska (PL)", "Portugal (PT)", "România (RO)", "Slovensko (SK)", "Slovenija (SI)", "España (ES)", "Sverige (SE)")) {
+                        partner.budget.projectPartnerCoFinancing.finances.forEach { finance ->
+                            if (finance.fundType == ProjectPartnerCoFinancingFundTypeData.MainFund && finance.percentage.intValueExact() != 80) {
+                                errorMessages.add(
+                                    buildErrorPreConditionCheckMessage(
+                                        "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.erdf.not.80",
+                                        mapOf(
+                                            "name" to (partner.abbreviation),
+                                            "erdf" to (finance.percentage.intValueExact().toString())
+                                        )
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
             }
             if (errorMessages.count() > 0) {
@@ -260,25 +281,7 @@ private fun checkIfPartnerContributionEqualsToBudget(partners: Set<ProjectPartne
             //        }
             //    }
             //}
-            // test Amund - check erdf 80% ADDED: remove for partners outside EU (have no ERDF)
-            partner.addresses.forEach { address ->
-                if (address.type == ProjectPartnerAddressTypeData.Organization
-                    && address.country in listOf("Österreich (AT)", "Belgique/België (BE)", "Bulgaria (BG)", "Hrvatska (HR)", "Kýpros (CY)", "Česko (CZ)", "Danmark (DK)", "Eesti (EE)", "Suomi/Finland (FI)", "France (FR)", "Deutschland (DE)", "Elláda (EL)", "Magyarország (HU)", "Éire/Ireland (IE)", "Italia (IT)", "Latvija (LV)", "Lietuva (LT)", "Luxembourg (LU)", "Malta (MT)", "Nederland (NL)", "Polska (PL)", "Portugal (PT)", "România (RO)", "Slovensko (SK)", "Slovenija (SI)", "España (ES)", "Sverige (SE)")) {
-                    partner.budget.projectPartnerCoFinancing.finances.forEach { finance ->
-                        if (finance.fundType == ProjectPartnerCoFinancingFundTypeData.MainFund && finance.percentage.intValueExact() != 80) {
-                            errorMessages.add(
-                                buildErrorPreConditionCheckMessage(
-                                    "$SECTION_B_ERROR_MESSAGES_PREFIX.budget.partner.contribution.erdf.not.80",
-                                    mapOf(
-                                        "name" to (partner.abbreviation),
-                                        "erdf" to (finance.percentage.intValueExact().toString())
-                                    )
-                                )
-                            )
-                        }
-                    }
-                }
-            }
+
             // Amund check legal status match of Partner and partner contribution
             if (!partner.budget.projectPartnerCoFinancing.partnerContributions.isEmpty()) {
                 if ((partner.legalStatusId.toString() == "1" && partner.budget.projectPartnerCoFinancing.partnerContributions.elementAt(0).status == ProjectPartnerContributionStatusData.Private) ||
@@ -1898,7 +1901,8 @@ private fun checkIfStateAidIsValid(partners: Set<ProjectPartnerData>) =
                     )
                 }
                  */
-                if (partner.stateAid?.answer4 ?: false &&
+                // Amund updated criteria for error
+                if ((partner.stateAid?.answer4 == true || partner.stateAid?.answer3 == true) &&
                     partner.stateAid?.activities.isNullOrEmpty() &&
                     isFieldVisible(ApplicationFormFieldId.PARTNER_STATE_AID_RELEVANT_ACTIVITIES))
                 {
